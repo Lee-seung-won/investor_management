@@ -152,5 +152,12 @@ export const dataQualityAPI = {
   getQualityTrends: (days?: number) => api.get('/api/data-quality/quality-trends', { params: { days } }),
 };
 
+// 매칭 알고리즘 API
+export const matchingAPI = {
+  matchInvestors: (data: any) => api.post('/api/matching/match', data),
+  getAvailableSectors: () => api.get('/api/matching/sectors'),
+  testAPI: () => api.get('/api/matching/test'),
+};
+
 
 export default api;

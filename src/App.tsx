@@ -7,7 +7,8 @@ import {
   FileTextOutlined,
   DollarOutlined,
   FundOutlined,
-  TagOutlined
+  TagOutlined,
+  ApiOutlined
 } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
@@ -16,6 +17,7 @@ import Articles from './pages/Articles';
 import Investments from './pages/Investments';
 import Funds from './pages/Funds';
 import Labeling from './pages/Labeling';
+import APIDocs from './pages/APIDocs';
 
 const { Header, Sider, Content } = Layout;
 
@@ -54,6 +56,11 @@ const AppContent: React.FC = () => {
       icon: <TagOutlined />,
       label: '라벨링',
     },
+    {
+      key: '/api-docs',
+      icon: <ApiOutlined />,
+      label: 'API 문서',
+    },
   ];
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -86,6 +93,7 @@ const AppContent: React.FC = () => {
             <Route path="/investments" component={Investments} />
             <Route path="/funds" component={Funds} />
             <Route path="/labeling" component={Labeling} />
+            <Route path="/api-docs" component={APIDocs} />
           </Switch>
         </Content>
       </Layout>
