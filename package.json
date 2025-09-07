@@ -27,7 +27,11 @@
   },
   "scripts": {
     "start": "react-scripts start",
+    "start:local": "REACT_APP_API_URL=http://localhost:8000 REACT_APP_ENVIRONMENT=local react-scripts start",
+    "start:railway": "REACT_APP_API_URL=https://web-production-7d32.up.railway.app REACT_APP_ENVIRONMENT=production react-scripts start",
     "build": "react-scripts build",
+    "build:local": "REACT_APP_API_URL=http://localhost:8000 REACT_APP_ENVIRONMENT=local react-scripts build",
+    "build:railway": "REACT_APP_API_URL=https://web-production-7d32.up.railway.app REACT_APP_ENVIRONMENT=production react-scripts build",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },

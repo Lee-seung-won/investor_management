@@ -1,6 +1,28 @@
 import axios from 'axios';
 
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'https://web-production-7d32.up.railway.app';
+// 환경에 따른 API URL 설정
+const getApiBaseUrl = () => {
+  const env = process.env.REACT_APP_ENVIRONMENT || 'production';
+  const customUrl = process.env.REACT_APP_API_URL;
+  
+  if (customUrl) {
+    return customUrl;
+  }
+  
+  switch (env) {
+    case 'local':
+      return 'http://localhost:8000';
+    case 'production':
+    default:
+      return 'https://web-production-7d32.up.railway.app';
+  }
+};
+
+const API_BASE_URL = getApiBaseUrl();
+
+// 환경 정보 로깅
+console.log(`🌐 API Base URL: ${API_BASE_URL}`);
+console.log(`🔧 Environment: ${process.env.REACT_APP_ENVIRONMENT || 'production'}`);
 
 const api = axios.create({
   baseURL: API_BASE_URL,

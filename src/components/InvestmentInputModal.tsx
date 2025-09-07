@@ -679,10 +679,20 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                 )}
               </div>
             }
-            rules={[{ required: false, message: '투자 금액을 입력해주세요.' }]}
+            rules={[
+              { required: false, message: '투자 금액을 입력해주세요.' },
+              { pattern: /^[\d,.\s]*$/, message: '숫자만 입력 가능합니다.' }
+            ]}
             style={{ width: '70%' }}
           >
-            <Input placeholder="투자 금액을 입력하세요" />
+            <Input 
+              placeholder="투자 금액을 입력하세요 (예: 10억원, 1000만원)" 
+              onChange={(e) => {
+                // 숫자, 쉼표, 점, 공백만 허용
+                const value = e.target.value.replace(/[^\d,.\s]/g, '');
+                form.setFieldsValue({ amount: value });
+              }}
+            />
           </Form.Item>
           <Form.Item
             name="currency"
@@ -751,10 +761,20 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                 <Form.Item
                   name="fund_amount"
                   label="펀드 규모"
-                  rules={[{ required: true, message: '펀드 규모를 입력해주세요.' }]}
+                  rules={[
+                    { required: true, message: '펀드 규모를 입력해주세요.' },
+                    { pattern: /^[\d,.\s]*$/, message: '숫자만 입력 가능합니다.' }
+                  ]}
                   style={{ width: '70%' }}
                 >
-                  <Input placeholder="펀드 규모를 입력하세요" />
+                  <Input 
+                    placeholder="펀드 규모를 입력하세요 (예: 1000억원, 10억달러)" 
+                    onChange={(e) => {
+                      // 숫자, 쉼표, 점, 공백만 허용
+                      const value = e.target.value.replace(/[^\d,.\s]/g, '');
+                      form.setFieldsValue({ fund_amount: value });
+                    }}
+                  />
                 </Form.Item>
                 <Form.Item
                   name="fund_currency"
