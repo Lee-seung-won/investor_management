@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Modal, Form, Input, Button, message } from 'antd';
+import { authAPI } from '../services/api';
 
 interface LoginModalProps {
   visible: boolean;
@@ -13,23 +14,12 @@ const LoginModal: React.FC<LoginModalProps> = ({ visible, onLogin }) => {
   const handleLogin = async (values: { name: string }) => {
     setLoading(true);
     try {
-      const response = await fetch('http://localhost:8000/api/auth/login', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ name: values.name }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.success) {
-          message.success(`환영합니다, ${data.user.name}님!`);
-          onLogin(data.user);
-          form.resetFields();
-        } else {
-          message.error('로그인에 실패했습니다.');
-        }
+      const response = await authAPI.login(values.name);
+      
+      if (response.data.success) {
+        message.success(`환영합니다, ${response.data.user.name}님!`);
+        onLogin(response.data.user);
+        form.resetFields();
       } else {
         message.error('로그인에 실패했습니다.');
       }
