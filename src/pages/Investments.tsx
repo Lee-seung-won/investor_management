@@ -4,6 +4,7 @@ import { SearchOutlined, ReloadOutlined, CheckOutlined, CloseOutlined, DeleteOut
 import { useHistory } from 'react-router-dom';
 import { investmentsAPI } from '../services/api';
 import { Investment } from '../types';
+import dayjs from 'dayjs';
 
 const { Search, TextArea } = Input;
 const { Option } = Select;
@@ -76,7 +77,7 @@ const Investments: React.FC = () => {
       amount: investment.amount,
       currency: investment.currency,
       sector: investment.sector,
-      investment_date: investment.investment_date ? new Date(investment.investment_date) : null,
+      investment_date: investment.investment_date ? dayjs(investment.investment_date) : null,
     });
     setEditModalVisible(true);
   };
