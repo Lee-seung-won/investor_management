@@ -42,7 +42,7 @@ const Articles: React.FC = () => {
       
       const serverParams: any = {
         skip: needsClientSideFiltering ? 0 : (pagination.current - 1) * pagination.pageSize,
-        limit: needsClientSideFiltering ? 5000 : pagination.pageSize, // 클라이언트 필터링시에만 큰 값 사용
+        limit: needsClientSideFiltering ? 1000 : pagination.pageSize, // 클라이언트 필터링시에도 1000개로 제한
         search: filters.search || undefined
       };
       

@@ -19,7 +19,8 @@ import {
   DeleteOutlined, 
   TagOutlined, 
   BarChartOutlined,
-  ReloadOutlined
+  ReloadOutlined,
+  DownloadOutlined
 } from '@ant-design/icons';
 import { labelingAPI } from '../services/api.ts';
 
@@ -202,6 +203,42 @@ const Labeling: React.FC = () => {
     });
   }, [fetchStats]);
 
+  // CSV 다운로드
+  const handleDownloadCSV = useCallback(async () => {
+    try {
+      const response = await labelingAPI.exportCSV();
+      
+      // Blob 생성
+      const blob = new Blob([response.data], { type: 'text/csv;charset=utf-8;' });
+      
+      // 다운로드 링크 생성
+      const link = document.createElement('a');
+      const url = URL.createObjectURL(blob);
+      link.setAttribute('href', url);
+      
+      // 파일명 설정 (응답 헤더에서 추출하거나 기본값 사용)
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = 'labeling_data.csv';
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      }
+      
+      link.setAttribute('download', filename);
+      link.style.visibility = 'hidden';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      
+      message.success('CSV 파일이 다운로드되었습니다.');
+    } catch (error) {
+      console.error('CSV 다운로드 오류:', error);
+      message.error('CSV 다운로드에 실패했습니다.');
+    }
+  }, []);
+
   useEffect(() => {
     console.log('라벨링 페이지 로드됨');
     fetchArticles();
@@ -324,9 +361,18 @@ const Labeling: React.FC = () => {
       <Card 
         title="라벨링할 기사 목록"
         extra={
-          <Button icon={<ReloadOutlined />} onClick={fetchArticles}>
-            새로고침
-          </Button>
+          <Space>
+            <Button 
+              icon={<DownloadOutlined />} 
+              onClick={handleDownloadCSV}
+              type="primary"
+            >
+              CSV 다운로드
+            </Button>
+            <Button icon={<ReloadOutlined />} onClick={fetchArticles}>
+              새로고침
+            </Button>
+          </Space>
         }
       >
         <Table

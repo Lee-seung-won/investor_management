@@ -26,7 +26,7 @@ console.log(`🔧 Environment: ${process.env.REACT_APP_ENVIRONMENT || 'productio
 
 const api = axios.create({
   baseURL: API_BASE_URL,
-  timeout: 10000,
+  timeout: 30000,  // 타임아웃을 30초로 증가
 });
 
 // 요청 인터셉터
@@ -127,6 +127,7 @@ export const labelingAPI = {
   createLabelingDataBatch: (data: any) => api.post('/api/labeling/data/batch', data),
   getStats: () => api.get('/api/labeling/stats'),
   deleteLabelingData: (articleId: number) => api.delete(`/api/labeling/data/${articleId}`),
+  exportCSV: () => api.get('/api/labeling/export/csv', { responseType: 'blob' }),
 };
 
 // 뉴스 수집 관련 API
