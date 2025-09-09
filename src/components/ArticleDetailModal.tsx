@@ -199,6 +199,8 @@ const ArticleDetailModal: React.FC<ArticleDetailModalProps> = ({
       <InvestmentInputModal
         visible={investmentModalVisible}
         article={article}
+        investorName={article?.search_investor?.name}
+        searchInvestorId={article?.search_investor_id}
         onCancel={handleInvestmentModalClose}
         onSave={(data) => {
           console.log('Investment data saved:', data);

@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { 
   Card, 
   Typography, 
   Tabs, 
   Button, 
   Input, 
-  Select, 
   Space, 
   message, 
   Divider,
@@ -23,12 +22,9 @@ import {
   CheckCircleOutlined,
   InfoCircleOutlined
 } from '@ant-design/icons';
-import { matchingAPI } from '../services/api';
 
 const { Title, Text, Paragraph } = Typography;
 const { TabPane } = Tabs;
-const { TextArea } = Input;
-const { Option } = Select;
 const { Panel } = Collapse;
 
 interface MatchingRequest {
@@ -48,7 +44,6 @@ interface MatchingResponse {
 
 const APIDocs: React.FC = () => {
   const [loading, setLoading] = useState(false);
-  const [availableSectors, setAvailableSectors] = useState<any[]>([]);
   const [matchingRequest, setMatchingRequest] = useState<MatchingRequest>({
     company_name: '',
     sectors: [],
@@ -57,19 +52,7 @@ const APIDocs: React.FC = () => {
   });
   const [matchingResponse, setMatchingResponse] = useState<MatchingResponse | null>(null);
   const [copiedText, setCopiedText] = useState<string>('');
-
-  // 사용 가능한 섹터 목록 조회
-  useEffect(() => {
-    const fetchSectors = async () => {
-      try {
-        const response = await matchingAPI.getAvailableSectors();
-        setAvailableSectors(response.data.sectors || []);
-      } catch (error) {
-        console.error('섹터 목록 조회 오류:', error);
-      }
-    };
-    fetchSectors();
-  }, []);
+  const [sectorInput, setSectorInput] = useState<string>('');
 
   // 매칭 API 테스트
   const handleMatchingTest = async () => {
@@ -78,18 +61,31 @@ const APIDocs: React.FC = () => {
       return;
     }
     if (matchingRequest.sectors.length === 0) {
-      message.error('최소 1개의 섹터를 선택해주세요.');
+      message.error('최소 1개의 섹터를 입력해주세요.');
       return;
     }
 
     setLoading(true);
     try {
-      const response = await matchingAPI.matchInvestors(matchingRequest);
-      setMatchingResponse(response.data);
+      const baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${baseUrl}/api/matching/match`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(matchingRequest)
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      setMatchingResponse(data);
       message.success('매칭 결과를 성공적으로 조회했습니다.');
     } catch (error: any) {
       console.error('매칭 API 오류:', error);
-      message.error(`매칭 API 오류: ${error.response?.data?.detail || error.message}`);
+      message.error(`매칭 API 오류: ${error.message}`);
     } finally {
       setLoading(false);
     }
@@ -245,23 +241,44 @@ const APIDocs: React.FC = () => {
                     </div>
 
                     <div>
-                      <Text strong>섹터 선택</Text>
-                      <Select
-                        mode="multiple"
-                        placeholder="섹터를 선택하세요"
-                        style={{ width: '100%' }}
-                        value={matchingRequest.sectors}
-                        onChange={(value) => setMatchingRequest({
-                          ...matchingRequest,
-                          sectors: value
-                        })}
-                      >
-                        {availableSectors.map((sector) => (
-                          <Option key={sector.name} value={sector.name}>
-                            {sector.name} ({sector.investor_count}개 투자사)
-                          </Option>
-                        ))}
-                      </Select>
+                      <Text strong>섹터 입력</Text>
+                      <Input
+                        placeholder="예: IT, AI, 핀테크 (쉼표로 구분)"
+                        value={sectorInput}
+                        onChange={(e) => {
+                          const inputValue = e.target.value;
+                          setSectorInput(inputValue);
+                          
+                          // 실시간으로 섹터 배열 업데이트
+                          const sectors = inputValue
+                            .split(',')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+                          
+                          setMatchingRequest({
+                            ...matchingRequest,
+                            sectors: sectors
+                          });
+                        }}
+                        onBlur={() => {
+                          // 포커스가 벗어날 때 최종 정리
+                          const sectors = sectorInput
+                            .split(',')
+                            .map(s => s.trim())
+                            .filter(s => s.length > 0);
+                          
+                          setMatchingRequest({
+                            ...matchingRequest,
+                            sectors: sectors
+                          });
+                        }}
+                      />
+                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        쉼표(,)로 구분하여 여러 섹터를 입력하세요
+                      </div>
+                      <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
+                        현재 입력된 섹터: {matchingRequest.sectors.length > 0 ? matchingRequest.sectors.join(', ') : '없음'}
+                      </div>
                     </div>
 
                     <div>

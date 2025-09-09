@@ -608,7 +608,8 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
               fetchInvestmentHistory();
             }
           }}
-          investorName={investor.name}
+          investorName={selectedArticle?.search_investor?.name || investor?.name}
+          searchInvestorId={selectedArticle?.search_investor_id || investor?.id}
         />
       )}
     </Modal>

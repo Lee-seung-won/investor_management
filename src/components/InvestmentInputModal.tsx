@@ -12,6 +12,7 @@ interface InvestmentInputModalProps {
   onSave: (investmentData: any) => void;
   article: Article | null;
   investorName?: string;
+  searchInvestorId?: number;
 }
 
 const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
@@ -19,7 +20,8 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   onCancel,
   onSave,
   article,
-  investorName
+  investorName,
+  searchInvestorId
 }) => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
@@ -282,10 +284,28 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
 
   // 모달이 열릴 때 투자사 이름 설정
   useEffect(() => {
-    if (visible && investorName) {
-      form.setFieldsValue({ investor_name: investorName });
+    if (visible) {
+      if (investorName) {
+        form.setFieldsValue({ investor_name: investorName });
+      } else if (searchInvestorId) {
+        // searchInvestorId가 있으면 투자사 정보를 조회해서 설정
+        fetchInvestorName(searchInvestorId);
+      }
     }
-  }, [visible, investorName, form]);
+  }, [visible, investorName, searchInvestorId, form]);
+
+  // 투자사 ID로 투자사 이름 조회
+  const fetchInvestorName = async (investorId: number) => {
+    try {
+      const response = await fetch(`http://localhost:8000/api/investors/${investorId}`);
+      if (response.ok) {
+        const investor = await response.json();
+        form.setFieldsValue({ investor_name: investor.name });
+      }
+    } catch (error) {
+      console.error('투자사 정보 조회 실패:', error);
+    }
+  };
 
   // 기사 본문이 변경될 때 투자 정보 자동 추출
   useEffect(() => {

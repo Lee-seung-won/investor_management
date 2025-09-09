@@ -25,6 +25,13 @@ export interface Article {
   is_processed: boolean;
   processing_status: string;
   additional_info: Record<string, any>;
+  search_investor_id?: number;
+  search_query?: string;
+  collection_batch_id?: string;
+  search_investor?: {
+    id: number;
+    name: string;
+  };
 }
 
 export interface Investment {
