@@ -1,6 +1,6 @@
 import React from 'react';
 import { BrowserRouter as Router, Route, Switch, useHistory, useLocation } from 'react-router-dom';
-import { Layout, Menu } from 'antd';
+import { Layout, Menu, Button, Space, Typography } from 'antd';
 import {
   DashboardOutlined,
   BankOutlined,
@@ -8,7 +8,9 @@ import {
   DollarOutlined,
   FundOutlined,
   TagOutlined,
-  ApiOutlined
+  ApiOutlined,
+  UserOutlined,
+  LogoutOutlined
 } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
@@ -18,12 +20,17 @@ import Investments from './pages/Investments';
 import Funds from './pages/Funds';
 import Labeling from './pages/Labeling';
 import APIDocs from './pages/APIDocs';
+import LoginModal from './components/LoginModal';
+import { UserProvider, useUser } from './contexts/UserContext';
 
 const { Header, Sider, Content } = Layout;
+const { Text } = Typography;
 
 const AppContent: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
+  const { user, login, logout, isLoggedIn } = useUser();
+  const [showLoginModal, setShowLoginModal] = React.useState(false);
 
   const menuItems = [
     {
@@ -67,6 +74,23 @@ const AppContent: React.FC = () => {
     history.push(key);
   };
 
+  const handleLogin = (userData: { id: number; name: string }) => {
+    // UserContext의 login 함수 호출
+    login(userData);
+    setShowLoginModal(false);
+  };
+
+  const handleLogout = () => {
+    logout();
+  };
+
+  // 로그인하지 않은 경우 로그인 모달 표시
+  React.useEffect(() => {
+    if (!isLoggedIn) {
+      setShowLoginModal(true);
+    }
+  }, [isLoggedIn]);
+
   return (
     <Layout style={{ minHeight: '100vh' }}>
       <Sider width={200} theme="light">
@@ -82,8 +106,22 @@ const AppContent: React.FC = () => {
         />
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)' }}>
+        <Header style={{ background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h1 style={{ margin: 0, color: '#001529' }}>투자사 기반 스타트업 뉴스 분석 시스템</h1>
+          {isLoggedIn && user && (
+            <Space>
+              <Text>
+                <UserOutlined /> {user.name}
+              </Text>
+              <Button 
+                type="text" 
+                icon={<LogoutOutlined />} 
+                onClick={handleLogout}
+              >
+                로그아웃
+              </Button>
+            </Space>
+          )}
         </Header>
         <Content style={{ padding: '24px', background: '#f0f2f5' }}>
           <Switch>
@@ -97,15 +135,22 @@ const AppContent: React.FC = () => {
           </Switch>
         </Content>
       </Layout>
+      
+      <LoginModal
+        visible={showLoginModal}
+        onLogin={handleLogin}
+      />
     </Layout>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <Router>
-      <AppContent />
-    </Router>
+    <UserProvider>
+      <Router>
+        <AppContent />
+      </Router>
+    </UserProvider>
   );
 };
 

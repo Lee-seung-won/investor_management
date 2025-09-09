@@ -27,11 +27,8 @@ const Investors: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedInvestorId, setSelectedInvestorId] = useState<number | null>(null);
-  const [articleCounts, setArticleCounts] = useState<{[key: number]: number}>({});
-
   useEffect(() => {
     fetchInvestors();
-    fetchArticleCounts();
   }, [pagination, filters, sorting]);
 
   const fetchInvestors = async () => {
@@ -54,18 +51,6 @@ const Investors: React.FC = () => {
     }
   };
 
-  const fetchArticleCounts = async () => {
-    try {
-      const response = await investorsAPI.getArticleCounts();
-      const counts: {[key: number]: number} = {};
-      response.data.forEach((item: any) => {
-        counts[item.investor_id] = item.article_count;
-      });
-      setArticleCounts(counts);
-    } catch (error) {
-      console.error('기사 개수를 불러오는데 실패했습니다:', error);
-    }
-  };
 
   const handleTableChange = (pagination: any) => {
     setPagination(pagination);
@@ -181,13 +166,13 @@ const Investors: React.FC = () => {
           )}
         </span>
       ),
-      dataIndex: 'id',
+      dataIndex: 'article_count',
       key: 'article_count',
       width: 120,
-      render: (id: number, record: any) => (
+      render: (articleCount: number, record: any) => (
         <div style={{ textAlign: 'center' }}>
           <Tag color="blue" style={{ fontSize: '12px' }}>
-            {record.article_count || articleCounts[id] || 0}개
+            {articleCount || 0}개
           </Tag>
         </div>
       ),

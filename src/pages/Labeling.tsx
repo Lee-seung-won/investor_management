@@ -23,6 +23,7 @@ import {
   DownloadOutlined
 } from '@ant-design/icons';
 import { labelingAPI } from '../services/api.ts';
+import { useUser } from '../contexts/UserContext';
 
 const { Option } = Select;
 const { Text, Title } = Typography;
@@ -85,6 +86,7 @@ const LABEL_OPTIONS = [
 ];
 
 const Labeling: React.FC = () => {
+  const { user } = useUser();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<LabelingStats | null>(null);
@@ -140,6 +142,7 @@ const Labeling: React.FC = () => {
       await labelingAPI.createLabelingDataBatch({
         article_id: selectedArticle.id,
         sentence_index: sentenceIndex,
+        user_id: user?.id,
         tokens: tokens.map(token => ({
           token_index: token.token_index,
           token_text: token.token_text,

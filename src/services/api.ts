@@ -133,8 +133,8 @@ export const labelingAPI = {
 // 뉴스 수집 관련 API
 export const newsCollectionAPI = {
   getStatus: () => api.get('/api/collect-news/status'),
-  startCollection: (limit: number = 10, resume: boolean = false) => api.post('/api/collect-news', { limit, resume }),
-  stopCollection: () => api.post('/api/collect-news/stop'),
+  startCollection: (user_id: number, limit: number = 10, resume: boolean = false) => api.post('/api/collect-news', { user_id, limit, resume }),
+  stopCollection: (user_id: number) => api.post('/api/collect-news/stop', { user_id }),
 };
 
 // 뉴스 소스 관련 API
@@ -158,6 +158,13 @@ export const matchingAPI = {
   matchInvestors: (data: any) => api.post('/api/matching/match', data),
   getAvailableSectors: () => api.get('/api/matching/sectors'),
   testAPI: () => api.get('/api/matching/test'),
+};
+
+// 사용자 인증 및 활동 로그 API
+export const authAPI = {
+  login: (name: string) => api.post('/api/auth/login', { name }),
+  getCurrentUser: (userId: number) => api.get('/api/auth/current-user', { params: { user_id: userId } }),
+  getActivityLogs: (userId?: number, limit?: number) => api.get('/api/auth/activity-logs', { params: { user_id: userId, limit } }),
 };
 
 

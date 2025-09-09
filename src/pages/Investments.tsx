@@ -21,8 +21,6 @@ const Investments: React.FC = () => {
     startup_name: '',
     investor_name: '',
     round_type: '',
-    is_verified: undefined as boolean | undefined,
-    min_confidence: undefined as number | undefined,
   });
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -63,15 +61,6 @@ const Investments: React.FC = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleVerifiedChange = (value: boolean | undefined) => {
-    setFilters({ ...filters, is_verified: value });
-    setPagination({ ...pagination, current: 1 });
-  };
-
-  const handleConfidenceChange = (value: number | undefined) => {
-    setFilters({ ...filters, min_confidence: value });
-    setPagination({ ...pagination, current: 1 });
-  };
 
   const showInvestmentDetail = (investment: Investment) => {
     setSelectedInvestment(investment);
@@ -107,7 +96,7 @@ const Investments: React.FC = () => {
         startup_name: values.startup_name,
         investor_name: values.investor_name,
         round_type: values.round_type,
-        amount: values.amount,
+        amount: values.amount ? String(values.amount) : null,
         currency: values.currency || 'KRW',
         sector: values.sector,
         investment_date: values.investment_date ? values.investment_date.toISOString().split('T')[0] : null,
@@ -278,25 +267,6 @@ const Investments: React.FC = () => {
             <Option value="시리즈 A">시리즈 A</Option>
             <Option value="시리즈 B">시리즈 B</Option>
             <Option value="시리즈 C">시리즈 C</Option>
-          </Select>
-          <Select
-            placeholder="검수상태"
-            allowClear
-            style={{ width: 120 }}
-            onChange={handleVerifiedChange}
-          >
-            <Option value={true}>검수완료</Option>
-            <Option value={false}>미검수</Option>
-          </Select>
-          <Select
-            placeholder="신뢰도"
-            allowClear
-            style={{ width: 120 }}
-            onChange={handleConfidenceChange}
-          >
-            <Option value={0.7}>높음 (70%+)</Option>
-            <Option value={0.3}>보통 (30%+)</Option>
-            <Option value={0.0}>낮음 (0%+)</Option>
           </Select>
           <Button 
             icon={<ReloadOutlined />} 

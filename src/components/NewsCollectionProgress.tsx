@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Card, Progress, Button, message, Space, Typography, Row, Col, Statistic, Spin } from 'antd';
 import { PlayCircleOutlined, StopOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
 import { newsCollectionAPI } from '../services/api.ts';
+import { useUser } from '../contexts/UserContext';
 
 const { Text } = Typography;
 
@@ -20,6 +21,7 @@ interface CollectionStatus {
 }
 
 const NewsCollectionProgress: React.FC = () => {
+  const { user } = useUser();
   const [status, setStatus] = useState<CollectionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [collecting, setCollecting] = useState(false);
@@ -35,9 +37,14 @@ const NewsCollectionProgress: React.FC = () => {
   };
 
   const startCollection = async (resume: boolean = false) => {
+    if (!user) {
+      message.error('로그인이 필요합니다.');
+      return;
+    }
+    
     try {
       setCollecting(true);
-      const response = await newsCollectionAPI.startCollection(20, resume);
+      const response = await newsCollectionAPI.startCollection(user.id, 20, resume);
       
       if (response.data.status === 'running') {
         message.warning('뉴스 수집이 이미 진행 중입니다.');
@@ -55,8 +62,13 @@ const NewsCollectionProgress: React.FC = () => {
   };
 
   const stopCollection = async () => {
+    if (!user) {
+      message.error('로그인이 필요합니다.');
+      return;
+    }
+    
     try {
-      const response = await newsCollectionAPI.stopCollection();
+      const response = await newsCollectionAPI.stopCollection(user.id);
       message.success(response.data.message);
       setPolling(false);
     } catch (error) {

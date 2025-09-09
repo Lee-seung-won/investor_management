@@ -18,9 +18,7 @@ const Articles: React.FC = () => {
   });
   const [filters, setFilters] = useState({
     search: '',
-    source: '',
     is_processed: undefined as boolean | undefined,
-    processing_status: '',
     article_type: '',
     accurate_investment: false,
     accurate_fund: false,
@@ -146,20 +144,12 @@ const Articles: React.FC = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleSourceChange = (value: string) => {
-    setFilters({ ...filters, source: value });
-    setPagination({ ...pagination, current: 1 });
-  };
 
   const handleProcessedChange = (value: boolean | undefined) => {
     setFilters({ ...filters, is_processed: value });
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleStatusChange = (value: string) => {
-    setFilters({ ...filters, processing_status: value });
-    setPagination({ ...pagination, current: 1 });
-  };
 
   const handleArticleTypeChange = (value: string) => {
     setFilters({ ...filters, article_type: value });
@@ -181,39 +171,47 @@ const Articles: React.FC = () => {
     setModalVisible(true);
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed': return 'green';
-      case 'processing': return 'blue';
-      case 'error': return 'red';
-      case 'pending': return 'orange';
-      default: return 'default';
-    }
-  };
-
-  const getStatusText = (status: string) => {
-    switch (status) {
-      case 'completed': return '완료';
-      case 'processing': return '처리중';
-      case 'error': return '오류';
-      case 'pending': return '대기';
-      default: return status;
-    }
-  };
 
   // 정확한 투자정보 기사인지 제목 기준으로 판단
   const isAccurateInvestmentArticle = (title: string) => {
-    // "투자유치" 키워드와 라운드 키워드가 모두 포함되어야 함
-    const hasInvestmentKeyword = title.includes('투자유치');
-    const hasRoundKeyword = ['시드', '시리즈', '라운드'].some(keyword => title.includes(keyword));
-    
-    return hasInvestmentKeyword && hasRoundKeyword;
+    // 투자 관련 키워드들
+    const investmentKeywords = [
+      '투자유치', '투자받', '투자받았', '투자받는', '투자받을',
+      '시드', '시리즈', '라운드', 'A라운드', 'B라운드', 'C라운드',
+      '투자금', '투자액', '투자규모', '투자금액',
+      '벤처캐피털', , '피투자', '피투자사',
+      '투자사', '투자기관', '투자유치', '투자성공',
+      '펀딩', '펀딩받', '펀딩받았', '펀딩받는',
+      '자금조달', '자금유치', '자금투입',
+      '투자유치', '투자성공', '투자완료'
+    ];
+
+    // 투자 관련 키워드가 포함되어 있는지 확인
+    const hasInvestmentKeyword = investmentKeywords.some(keyword => 
+      keyword && title.toLowerCase().includes(keyword.toLowerCase())
+    );
+
+    return hasInvestmentKeyword;
   };
 
   // 정확한 펀드정보 기사인지 제목 기준으로 판단
   const isAccurateFundArticle = (title: string) => {
-    // "펀드 결성" 또는 "펀드" 키워드가 포함되어야 함
-    const hasFundKeyword = ['펀드 결성', '펀드'].some(keyword => title.includes(keyword));
+    // 펀드 관련 키워드들
+    const fundKeywords = [
+      '펀드 결성', '펀드 설립', '펀드 출시', '펀드 런칭',
+      '펀드 조성', '펀드 모집', '펀드 운용', '펀드 관리', 
+      '투자펀드', '자산운용', '자산관리',
+      '펀드매니저', '펀드운용사', '펀드사',
+      '펀드 규모', '펀드 규모', '펀드 조성',
+      '펀드 투자', '펀드 투자처', '펀드 투자처',
+      '펀드 성과', '펀드 수익', '펀드 운용성과',
+      '펀드 포트폴리오', '펀드 투자처', '펀드 투자처', '펀드', '펀딩'
+    ];
+    
+    // 펀드 관련 키워드가 포함되어 있는지 확인
+    const hasFundKeyword = fundKeywords.some(keyword => 
+      keyword && title.toLowerCase().includes(keyword.toLowerCase())
+    );
     
     return hasFundKeyword;
   };
@@ -452,24 +450,6 @@ const Articles: React.FC = () => {
       },
     },
     {
-      title: '처리 상태',
-      dataIndex: 'processing_status',
-      key: 'processing_status',
-      width: 120,
-      render: (status: string, record: Article) => (
-        <div>
-          <Tag color={getStatusColor(status)}>
-            {getStatusText(status)}
-          </Tag>
-          {record.is_processed && (
-            <Tag color="green" style={{ marginTop: 4, display: 'block' }}>
-              처리완료
-            </Tag>
-          )}
-        </div>
-      ),
-    },
-    {
       title: '수집일',
       dataIndex: 'scraped_at',
       key: 'scraped_at',
@@ -518,27 +498,6 @@ const Articles: React.FC = () => {
                 onSearch={handleSearch}
                 prefix={<SearchOutlined />}
               />
-              <Select
-                placeholder="뉴스 소스"
-                allowClear
-                style={{ width: 150 }}
-                onChange={handleSourceChange}
-              >
-                <Option value="techcrunch.com">TechCrunch</Option>
-                <Option value="venturebeat.com">VentureBeat</Option>
-                <Option value="news.naver.com">네이버 뉴스</Option>
-              </Select>
-              <Select
-                placeholder="처리 상태"
-                allowClear
-                style={{ width: 120 }}
-                onChange={handleStatusChange}
-              >
-                <Option value="pending">대기</Option>
-                <Option value="processing">처리중</Option>
-                <Option value="completed">완료</Option>
-                <Option value="error">오류</Option>
-              </Select>
               <Select
                 placeholder="처리 여부"
                 allowClear

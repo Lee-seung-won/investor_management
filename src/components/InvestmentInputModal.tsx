@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Modal, Form, Input, Select, Button, message, Space, Row, Col, Card, Typography, Spin, Radio, DatePicker } from 'antd';
 import { Article } from '../types/index';
 import { investmentsAPI, articlesAPI, fundsAPI } from '../services/api.ts';
+import { useUser } from '../contexts/UserContext';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -23,6 +24,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   investorName,
   searchInvestorId
 }) => {
+  const { user } = useUser();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [scrapingContent, setScrapingContent] = useState(false);
@@ -30,11 +32,115 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   const [investmentType, setInvestmentType] = useState<'investment' | 'fund' | 'none'>('investment');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualContent, setManualContent] = useState('');
+  const [amountDisplay, setAmountDisplay] = useState('');
+
+  // 숫자를 한글로 변환하는 함수
+  const convertNumberToKorean = (num: string): string => {
+    if (!num || num === '') return '';
+    
+    // 숫자만 추출 (쉼표, 공백 제거)
+    const cleanNum = num.replace(/[,\s]/g, '');
+    const number = parseInt(cleanNum);
+    
+    if (isNaN(number) || number === 0) return '';
+    
+    const units = ['', '만', '억', '조', '경'];
+    const result = [];
+    
+    let unitIndex = 0;
+    let remaining = number;
+    
+    while (remaining > 0 && unitIndex < units.length) {
+      const currentUnit = remaining % 10000;
+      if (currentUnit > 0) {
+        if (currentUnit >= 1000) {
+          const thousands = Math.floor(currentUnit / 1000);
+          const hundreds = currentUnit % 1000;
+          if (hundreds === 0) {
+            result.unshift(`${thousands}천${units[unitIndex]}`);
+          } else if (hundreds >= 100) {
+            const hundredThousands = Math.floor(hundreds / 100);
+            const tens = hundreds % 100;
+            if (tens === 0) {
+              result.unshift(`${thousands}천${hundredThousands}백${units[unitIndex]}`);
+            } else if (tens >= 10) {
+              const tenThousands = Math.floor(tens / 10);
+              const ones = tens % 10;
+              if (ones === 0) {
+                result.unshift(`${thousands}천${hundredThousands}백${tenThousands}십${units[unitIndex]}`);
+              } else {
+                result.unshift(`${thousands}천${hundredThousands}백${tenThousands}십${ones}${units[unitIndex]}`);
+              }
+            } else {
+              result.unshift(`${thousands}천${hundredThousands}백${tens}${units[unitIndex]}`);
+            }
+          } else if (hundreds >= 100) {
+            const hundredThousands = Math.floor(hundreds / 100);
+            const tens = hundreds % 100;
+            if (tens === 0) {
+              result.unshift(`${thousands}천${hundredThousands}백${units[unitIndex]}`);
+            } else if (tens >= 10) {
+              const tenThousands = Math.floor(tens / 10);
+              const ones = tens % 10;
+              if (ones === 0) {
+                result.unshift(`${thousands}천${hundredThousands}백${tenThousands}십${units[unitIndex]}`);
+              } else {
+                result.unshift(`${thousands}천${hundredThousands}백${tenThousands}십${ones}${units[unitIndex]}`);
+              }
+            } else {
+              result.unshift(`${thousands}천${hundredThousands}백${tens}${units[unitIndex]}`);
+            }
+          } else if (hundreds >= 10) {
+            const tenThousands = Math.floor(hundreds / 10);
+            const ones = hundreds % 10;
+            if (ones === 0) {
+              result.unshift(`${thousands}천${tenThousands}십${units[unitIndex]}`);
+            } else {
+              result.unshift(`${thousands}천${tenThousands}십${ones}${units[unitIndex]}`);
+            }
+          } else {
+            result.unshift(`${thousands}천${hundreds}${units[unitIndex]}`);
+          }
+        } else if (currentUnit >= 100) {
+          const hundreds = Math.floor(currentUnit / 100);
+          const tens = currentUnit % 100;
+          if (tens === 0) {
+            result.unshift(`${hundreds}백${units[unitIndex]}`);
+          } else if (tens >= 10) {
+            const tenThousands = Math.floor(tens / 10);
+            const ones = tens % 10;
+            if (ones === 0) {
+              result.unshift(`${hundreds}백${tenThousands}십${units[unitIndex]}`);
+            } else {
+              result.unshift(`${hundreds}백${tenThousands}십${ones}${units[unitIndex]}`);
+            }
+          } else {
+            result.unshift(`${hundreds}백${tens}${units[unitIndex]}`);
+          }
+        } else if (currentUnit >= 10) {
+          const tens = Math.floor(currentUnit / 10);
+          const ones = currentUnit % 10;
+          if (ones === 0) {
+            result.unshift(`${tens}십${units[unitIndex]}`);
+          } else {
+            result.unshift(`${tens}십${ones}${units[unitIndex]}`);
+          }
+        } else {
+          result.unshift(`${currentUnit}${units[unitIndex]}`);
+        }
+      }
+      remaining = Math.floor(remaining / 10000);
+      unitIndex++;
+    }
+    
+    return result.join('');
+  };
 
   // 투자 유형이 변경될 때 폼 초기화 및 추출된 정보 적용
   const handleInvestmentTypeChange = (value: 'investment' | 'fund' | 'none') => {
     setInvestmentType(value);
     form.resetFields();
+    setAmountDisplay(''); // 한글 표시 초기화
     
     // 추출된 정보가 있으면 새 유형에 맞게 적용
     if (extractedInfo.round || extractedInfo.sector || extractedInfo.amount) {
@@ -285,6 +391,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   // 모달이 열릴 때 투자사 이름 설정
   useEffect(() => {
     if (visible) {
+      setAmountDisplay(''); // 한글 표시 초기화
       if (investorName) {
         form.setFieldsValue({ investor_name: investorName });
       } else if (searchInvestorId) {
@@ -342,7 +449,8 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
             null,
           extraction_method: 'manual',
           is_verified: true,
-          is_correct: true
+          is_correct: true,
+          user_id: user?.id
         };
         
         await investmentsAPI.createInvestment(investmentData);
@@ -364,7 +472,8 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
             (typeof values.fund_end_date === 'string' ? values.fund_end_date : values.fund_end_date.format('YYYY-MM-DD')) : 
             null,
           fund_sector: values.fund_sector,
-          fund_manager: values.fund_manager
+          fund_manager: values.fund_manager,
+          user_id: user?.id
         };
         
         await fundsAPI.createFund(fundData);
@@ -705,14 +814,34 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
             ]}
             style={{ width: '70%' }}
           >
-            <Input 
-              placeholder="투자 금액을 입력하세요 (예: 10억원, 1000만원)" 
-              onChange={(e) => {
-                // 숫자, 쉼표, 점, 공백만 허용
-                const value = e.target.value.replace(/[^\d,.\s]/g, '');
-                form.setFieldsValue({ amount: value });
-              }}
-            />
+            <div>
+              <Input 
+                placeholder="투자 금액을 입력하세요 (예: 4000000)" 
+                onChange={(e) => {
+                  // 숫자, 쉼표, 점, 공백만 허용
+                  const value = e.target.value.replace(/[^\d,.\s]/g, '');
+                  form.setFieldsValue({ amount: value });
+                  
+                  // 한글 변환
+                  const koreanAmount = convertNumberToKorean(value);
+                  setAmountDisplay(koreanAmount);
+                }}
+              />
+              {amountDisplay && (
+                <div style={{ 
+                  marginTop: '4px', 
+                  fontSize: '12px', 
+                  color: '#1890ff',
+                  fontWeight: 'bold',
+                  backgroundColor: '#f0f8ff',
+                  padding: '4px 8px',
+                  borderRadius: '4px',
+                  border: '1px solid #d6e4ff'
+                }}>
+                  {amountDisplay}원
+                </div>
+              )}
+            </div>
           </Form.Item>
           <Form.Item
             name="currency"
@@ -787,14 +916,34 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                   ]}
                   style={{ width: '70%' }}
                 >
-                  <Input 
-                    placeholder="펀드 규모를 입력하세요 (예: 1000억원, 10억달러)" 
-                    onChange={(e) => {
-                      // 숫자, 쉼표, 점, 공백만 허용
-                      const value = e.target.value.replace(/[^\d,.\s]/g, '');
-                      form.setFieldsValue({ fund_amount: value });
-                    }}
-                  />
+                  <div>
+                    <Input 
+                      placeholder="펀드 규모를 입력하세요 (예: 100000000000)" 
+                      onChange={(e) => {
+                        // 숫자, 쉼표, 점, 공백만 허용
+                        const value = e.target.value.replace(/[^\d,.\s]/g, '');
+                        form.setFieldsValue({ fund_amount: value });
+                        
+                        // 한글 변환
+                        const koreanAmount = convertNumberToKorean(value);
+                        setAmountDisplay(koreanAmount);
+                      }}
+                    />
+                    {amountDisplay && (
+                      <div style={{ 
+                        marginTop: '4px', 
+                        fontSize: '12px', 
+                        color: '#1890ff',
+                        fontWeight: 'bold',
+                        backgroundColor: '#f0f8ff',
+                        padding: '4px 8px',
+                        borderRadius: '4px',
+                        border: '1px solid #d6e4ff'
+                      }}>
+                        {amountDisplay}원
+                      </div>
+                    )}
+                  </div>
                 </Form.Item>
                 <Form.Item
                   name="fund_currency"
