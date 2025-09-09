@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Modal, Form, Input, Select, Button, message, Space, Row, Col, Card, Typography, Spin, Radio, DatePicker } from 'antd';
 import { Article } from '../types/index';
-import { investmentsAPI, articlesAPI, fundsAPI } from '../services/api.ts';
+import { investmentsAPI, articlesAPI, fundsAPI, investorsAPI } from '../services/api.ts';
 import { useUser } from '../contexts/UserContext';
 
 const { Option } = Select;
@@ -404,10 +404,9 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   // 투자사 ID로 투자사 이름 조회
   const fetchInvestorName = async (investorId: number) => {
     try {
-      const response = await fetch(`http://localhost:8000/api/investors/${investorId}`);
-      if (response.ok) {
-        const investor = await response.json();
-        form.setFieldsValue({ investor_name: investor.name });
+      const response = await investorsAPI.getInvestor(investorId);
+      if (response.data) {
+        form.setFieldsValue({ investor_name: response.data.name });
       }
     } catch (error) {
       console.error('투자사 정보 조회 실패:', error);

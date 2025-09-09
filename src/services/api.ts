@@ -9,6 +9,11 @@ const getApiBaseUrl = () => {
     return customUrl;
   }
   
+  // Vercel 배포 환경에서는 Railway URL을 직접 사용
+  if (window.location.hostname.includes('vercel.app')) {
+    return 'https://web-production-7d32.up.railway.app';
+  }
+  
   switch (env) {
     case 'local':
       return 'http://localhost:8000';
