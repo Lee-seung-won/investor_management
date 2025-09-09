@@ -156,17 +156,15 @@ const NewsCollectionProgress: React.FC = () => {
                     수집 재개
                   </Button>
                 ) : (
-                  /* 재개 불가능한 경우: 오늘 수집하지 않았으면 시작 버튼 표시 */
-                  !status?.last_collection_date && (
-                    <Button 
-                      type="primary" 
-                      icon={<PlayCircleOutlined />}
-                      onClick={() => startCollection(false)}
-                      loading={collecting}
-                    >
-                      수집 시작
-                    </Button>
-                  )
+                  /* 재개 불가능한 경우: 시작 버튼 표시 (하루 제한은 서버에서 처리) */
+                  <Button 
+                    type="primary" 
+                    icon={<PlayCircleOutlined />}
+                    onClick={() => startCollection(false)}
+                    loading={collecting}
+                  >
+                    수집 시작
+                  </Button>
                 )}
               </>
             ) : (
