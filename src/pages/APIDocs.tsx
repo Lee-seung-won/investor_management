@@ -28,8 +28,7 @@ const { TabPane } = Tabs;
 const { Panel } = Collapse;
 
 interface MatchingRequest {
-  company_name: string;
-  sectors: string[];
+  prompt: string;
   top_k: number;
   min_confidence: number;
 }
@@ -45,23 +44,17 @@ interface MatchingResponse {
 const APIDocs: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [matchingRequest, setMatchingRequest] = useState<MatchingRequest>({
-    company_name: '',
-    sectors: [],
+    prompt: '',
     top_k: 10,
     min_confidence: 0.0
   });
   const [matchingResponse, setMatchingResponse] = useState<MatchingResponse | null>(null);
   const [copiedText, setCopiedText] = useState<string>('');
-  const [sectorInput, setSectorInput] = useState<string>('');
 
   // 매칭 API 테스트
   const handleMatchingTest = async () => {
-    if (!matchingRequest.company_name.trim()) {
-      message.error('회사명을 입력해주세요.');
-      return;
-    }
-    if (matchingRequest.sectors.length === 0) {
-      message.error('최소 1개의 섹터를 입력해주세요.');
+    if (!matchingRequest.prompt.trim()) {
+      message.error('프롬프트를 입력해주세요.');
       return;
     }
 
@@ -103,8 +96,7 @@ const APIDocs: React.FC = () => {
   // 예제 요청 JSON 생성
   const generateExampleRequest = () => {
     return JSON.stringify({
-      company_name: "테크스타트업",
-      sectors: ["IT", "AI", "핀테크"],
+      prompt: "AI 스타트업에서 투자를 받고 싶어요",
       top_k: 5,
       min_confidence: 0.3
     }, null, 2);
@@ -123,9 +115,9 @@ const APIDocs: React.FC = () => {
       <Card>
         <div style={{ textAlign: 'center', marginBottom: '32px' }}>
           <ApiOutlined style={{ fontSize: '48px', color: '#1890ff', marginBottom: '16px' }} />
-          <Title level={2}>투자사 매칭 API</Title>
+          <Title level={2}>프롬프트 기반 투자사 매칭 API</Title>
           <Paragraph style={{ fontSize: '16px', color: '#666' }}>
-            기업명과 섹터를 입력하여 적합한 투자사를 우선순위별로 추천받는 API입니다.
+            자연어 프롬프트를 입력하면 자동으로 회사명과 섹터를 추출하여 적합한 투자사를 우선순위별로 추천받는 API입니다.
           </Paragraph>
         </div>
 
@@ -139,7 +131,7 @@ const APIDocs: React.FC = () => {
                     <strong>엔드포인트:</strong> <code>POST /api/matching/match</code>
                   </Paragraph>
                   <Paragraph>
-                    <strong>기능:</strong> 기업명과 섹터를 기반으로 적합한 투자사를 우선순위별로 추천
+                    <strong>기능:</strong> 자연어 프롬프트에서 회사명과 섹터를 자동 추출하여 적합한 투자사를 우선순위별로 추천
                   </Paragraph>
                   <Paragraph>
                     <strong>응답 형식:</strong> JSON
@@ -160,16 +152,10 @@ const APIDocs: React.FC = () => {
                     </thead>
                     <tbody>
                       <tr>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>company_name</td>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>prompt</td>
                         <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>string</td>
                         <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>✅</td>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>매칭할 회사명</td>
-                      </tr>
-                      <tr>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>sectors</td>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>string[]</td>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>✅</td>
-                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>회사 섹터 목록</td>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>자연어 프롬프트 (회사명과 섹터가 포함된 문장)</td>
                       </tr>
                       <tr>
                         <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>top_k</td>
@@ -194,8 +180,8 @@ const APIDocs: React.FC = () => {
                     <Panel header="응답 구조 보기" key="1">
                       <pre style={{ backgroundColor: '#f5f5f5', padding: '16px', borderRadius: '4px' }}>
 {`{
-  "company_name": "테크스타트업",
-  "sectors": ["IT", "AI", "핀테크"],
+  "company_name": "AI",
+  "sectors": ["IT", "금융"],
   "matched_investors": [
     {
       "investor_id": 123,
@@ -212,7 +198,7 @@ const APIDocs: React.FC = () => {
     }
   ],
   "total_found": 25,
-  "algorithm_version": "1.0"
+  "algorithm_version": "2.0"
 }`}
                       </pre>
                     </Panel>
@@ -229,55 +215,21 @@ const APIDocs: React.FC = () => {
                 <Card title="🔧 요청 설정" size="small">
                   <Space direction="vertical" style={{ width: '100%' }}>
                     <div>
-                      <Text strong>회사명</Text>
-                      <Input
-                        placeholder="예: 테크스타트업"
-                        value={matchingRequest.company_name}
+                      <Text strong>프롬프트 입력</Text>
+                      <Input.TextArea
+                        placeholder="예: AI 스타트업에서 투자를 받고 싶어요"
+                        value={matchingRequest.prompt}
                         onChange={(e) => setMatchingRequest({
                           ...matchingRequest,
-                          company_name: e.target.value
+                          prompt: e.target.value
                         })}
-                      />
-                    </div>
-
-                    <div>
-                      <Text strong>섹터 입력</Text>
-                      <Input
-                        placeholder="예: IT, AI, 핀테크 (쉼표로 구분)"
-                        value={sectorInput}
-                        onChange={(e) => {
-                          const inputValue = e.target.value;
-                          setSectorInput(inputValue);
-                          
-                          // 실시간으로 섹터 배열 업데이트
-                          const sectors = inputValue
-                            .split(',')
-                            .map(s => s.trim())
-                            .filter(s => s.length > 0);
-                          
-                          setMatchingRequest({
-                            ...matchingRequest,
-                            sectors: sectors
-                          });
-                        }}
-                        onBlur={() => {
-                          // 포커스가 벗어날 때 최종 정리
-                          const sectors = sectorInput
-                            .split(',')
-                            .map(s => s.trim())
-                            .filter(s => s.length > 0);
-                          
-                          setMatchingRequest({
-                            ...matchingRequest,
-                            sectors: sectors
-                          });
-                        }}
+                        rows={3}
                       />
                       <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                        쉼표(,)로 구분하여 여러 섹터를 입력하세요
+                        자연어로 회사명과 섹터가 포함된 문장을 입력하세요. 시스템이 자동으로 추출합니다.
                       </div>
                       <div style={{ fontSize: '11px', color: '#999', marginTop: '2px' }}>
-                        현재 입력된 섹터: {matchingRequest.sectors.length > 0 ? matchingRequest.sectors.join(', ') : '없음'}
+                        예시: "소프트웨어 개발 회사에서 투자를 받고 싶어요", "바이오테크 스타트업에 투자받고 싶습니다"
                       </div>
                     </div>
 
@@ -375,6 +327,54 @@ const APIDocs: React.FC = () => {
           {/* 매칭 알고리즘 */}
           <TabPane tab="매칭 알고리즘" key="3">
             <Row gutter={[24, 24]}>
+              <Col span={24}>
+                <Card title="🔍 프롬프트 파싱 과정" size="small">
+                  <Alert
+                    message="프롬프트에서 회사명과 섹터를 자동으로 추출하는 과정입니다."
+                    type="info"
+                    style={{ marginBottom: '24px' }}
+                  />
+                  
+                  <Row gutter={[16, 16]}>
+                    <Col span={12}>
+                      <Card 
+                        title="1️⃣ 회사명 추출" 
+                        size="small"
+                        style={{ textAlign: 'center', backgroundColor: '#f6ffed' }}
+                      >
+                        <div style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
+                          정규식 패턴 매칭
+                        </div>
+                        <div style={{ textAlign: 'left', fontSize: '12px' }}>
+                          <div>• <strong>패턴 1:</strong> "회사", "기업", "스타트업" 앞의 단어</div>
+                          <div>• <strong>패턴 2:</strong> "에서", "이", "가", "을", "를" 앞의 단어</div>
+                          <div>• <strong>패턴 3:</strong> "의", "에", "로", "으로" 앞의 단어</div>
+                          <div>• <strong>기본값:</strong> 프롬프트의 첫 10단어</div>
+                        </div>
+                      </Card>
+                    </Col>
+                    
+                    <Col span={12}>
+                      <Card 
+                        title="2️⃣ 섹터 추출" 
+                        size="small"
+                        style={{ textAlign: 'center', backgroundColor: '#fff7e6' }}
+                      >
+                        <div style={{ fontSize: '14px', color: '#666', marginBottom: '12px' }}>
+                          키워드 기반 매칭
+                        </div>
+                        <div style={{ textAlign: 'left', fontSize: '12px' }}>
+                          <div>• <strong>IT:</strong> it, 소프트웨어, AI, 테크, 기술</div>
+                          <div>• <strong>바이오:</strong> 바이오, 의료, 헬스케어, 제약</div>
+                          <div>• <strong>제조:</strong> 제조, 자동차, 전자, 반도체</div>
+                          <div>• <strong>기본값:</strong> IT (매칭 없을 시)</div>
+                        </div>
+                      </Card>
+                    </Col>
+                  </Row>
+                </Card>
+              </Col>
+
               <Col span={24}>
                 <Card title="🎯 매칭 점수 계산 방식" size="small">
                   <Alert
@@ -670,8 +670,7 @@ url = "${baseUrl}/api/matching/match"
 
 # 요청 데이터
 data = {
-    "company_name": "테크스타트업",
-    "sectors": ["IT", "AI", "핀테크"],
+    "prompt": "AI 스타트업에서 투자를 받고 싶어요",
     "top_k": 5,
     "min_confidence": 0.3
 }
@@ -700,8 +699,7 @@ const generateJavaScriptExample = () => {
 const apiUrl = "${baseUrl}/api/matching/match";
 
 const requestData = {
-    company_name: "테크스타트업",
-    sectors: ["IT", "AI", "핀테크"],
+    prompt: "AI 스타트업에서 투자를 받고 싶어요",
     top_k: 5,
     min_confidence: 0.3
 };
@@ -750,8 +748,7 @@ const generateSpringBootExample = () => {
 @NoArgsConstructor
 @AllArgsConstructor
 public class MatchingRequest {
-    private String companyName;
-    private List<String> sectors;
+    private String prompt;
     private Integer topK = 10;
     private Double minConfidence = 0.0;
 }
@@ -794,9 +791,8 @@ public class InvestorMatchingService {
     @Autowired
     private RestTemplate restTemplate;
     
-    public MatchingResponse findMatchingInvestors(String companyName, List<String> sectors, 
-                                                  Integer topK, Double minConfidence) {
-        MatchingRequest request = new MatchingRequest(companyName, sectors, topK, minConfidence);
+    public MatchingResponse findMatchingInvestors(String prompt, Integer topK, Double minConfidence) {
+        MatchingRequest request = new MatchingRequest(prompt, topK, minConfidence);
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -829,8 +825,7 @@ public class InvestorMatchingController {
     public ResponseEntity<MatchingResponse> matchInvestors(@RequestBody MatchingRequest request) {
         try {
             MatchingResponse response = matchingService.findMatchingInvestors(
-                request.getCompanyName(),
-                request.getSectors(),
+                request.getPrompt(),
                 request.getTopK(),
                 request.getMinConfidence()
             );
@@ -869,8 +864,7 @@ public class ExampleController {
     public ResponseEntity<?> example() {
         // 투자사 매칭 요청
         MatchingResponse response = matchingService.findMatchingInvestors(
-            "테크스타트업",
-            Arrays.asList("IT", "AI", "핀테크"),
+            "AI 스타트업에서 투자를 받고 싶어요",
             5,
             0.3
         );
