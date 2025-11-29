@@ -251,10 +251,13 @@ export const userManagementAPI = {
 
 // 블랙리스트 API
 export const blacklistAPI = {
-  getBlacklists: (skip?: number, limit?: number) => api.get('/api/blacklist', { params: { skip, limit } }),
+  getBlacklists: (skip?: number, limit?: number) => api.get('/api/blacklist/', { params: { skip, limit } }),
   getArticleCount: (domain: string) => api.get('/api/blacklist/article-count', { params: { domain } }),
-  createBlacklist: (domain: string, reason?: string, created_by?: string, delete_articles?: boolean) => 
-    api.post('/api/blacklist', { domain, reason, created_by }, { params: { delete_articles: delete_articles ?? true } }),
+  createBlacklist: (domain: string, reason?: string, created_by?: string, delete_articles?: boolean) => {
+    // URL 끝에 슬래시 추가하고 query string을 직접 포함
+    const deleteArticles = delete_articles ?? true;
+    return api.post(`/api/blacklist/?delete_articles=${deleteArticles}`, { domain, reason, created_by });
+  },
   deleteBlacklist: (blacklistId: number) => api.delete(`/api/blacklist/${blacklistId}`),
 };
 

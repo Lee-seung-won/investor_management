@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { Table, Card, Input, Select, Tag, Space, Button, message } from 'antd';
-import { SearchOutlined, ReloadOutlined } from '@ant-design/icons';
+import { Card, Input, Select, Tag, Space, Button, message, Row, Col, Spin } from 'antd';
+import { SearchOutlined, ReloadOutlined, GlobalOutlined } from '@ant-design/icons';
 import { investorsAPI } from '../services/api';
 import { Investor } from '../types';
 import InvestorDetailModal from '../components/InvestorDetailModal';
@@ -9,7 +9,6 @@ const { Search } = Input;
 const { Option } = Select;
 
 const Investors: React.FC = () => {
-  const [investors, setInvestors] = useState<Investor[]>([]);
   const [loading, setLoading] = useState(true);
   const [total, setTotal] = useState(0);
   const [pagination, setPagination] = useState({
@@ -28,6 +27,8 @@ const Investors: React.FC = () => {
   });
   const [modalVisible, setModalVisible] = useState(false);
   const [selectedInvestorId, setSelectedInvestorId] = useState<number | null>(null);
+  const [investors, setInvestors] = useState<Investor[]>([]);
+  
   useEffect(() => {
     fetchInvestors();
   }, [pagination, filters, sorting]);
@@ -43,19 +44,18 @@ const Investors: React.FC = () => {
       };
       
       const response = await investorsAPI.getInvestors(params);
-      setInvestors(response.data.investors);
-      setTotal(response.data.total);
-    } catch (error) {
-      message.error('투자사 목록을 불러오는데 실패했습니다.');
+      setInvestors(response.data.investors || []);
+      setTotal(response.data.total || 0);
+    } catch (error: any) {
+      console.error('투자사 목록 로딩 오류:', error);
+      message.error(`투자사 목록을 불러오는데 실패했습니다: ${error.response?.data?.detail || error.message || '알 수 없는 오류'}`);
+      setInvestors([]);
+      setTotal(0);
     } finally {
       setLoading(false);
     }
   };
 
-
-  const handleTableChange = (pagination: any) => {
-    setPagination(pagination);
-  };
 
   const handleSearch = (value: string) => {
     setFilters({ ...filters, search: value });
@@ -95,115 +95,6 @@ const Investors: React.FC = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const columns = [
-    {
-      title: 'ID',
-      dataIndex: 'id',
-      key: 'id',
-      width: 80,
-    },
-    {
-      title: (
-        <span 
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleSortChange('name')}
-        >
-          투자사명
-          {sorting.sort_by === 'name' && (
-            <span style={{ marginLeft: 4 }}>
-              {sorting.sort_order === 'asc' ? '↑' : '↓'}
-            </span>
-          )}
-        </span>
-      ),
-      dataIndex: 'name',
-      key: 'name',
-      render: (text: string, record: Investor) => (
-        <div>
-          <div 
-            style={{ 
-              fontWeight: 'bold', 
-              color: '#1890ff', 
-              cursor: 'pointer',
-              textDecoration: 'underline'
-            }}
-            onClick={() => handleInvestorClick(record.id)}
-          >
-            {text}
-          </div>
-          <div style={{ fontSize: 12, color: '#666' }}>
-            {record.type}
-          </div>
-        </div>
-      ),
-    },
-    {
-      title: '전문분야',
-      dataIndex: 'sectors',
-      key: 'sectors',
-      render: (sectors: string[]) => (
-        <div>
-          {sectors && sectors.length > 0 ? (
-            sectors.slice(0, 3).map((sector, index) => (
-              <Tag key={index} color="blue" style={{ marginBottom: 4 }}>
-                {sector}
-              </Tag>
-            ))
-          ) : (
-            <span style={{ color: '#999' }}>-</span>
-          )}
-          {sectors && sectors.length > 3 && (
-            <Tag color="default">+{sectors.length - 3}</Tag>
-          )}
-        </div>
-      ),
-    },
-    {
-      title: '웹사이트',
-      dataIndex: 'website',
-      key: 'website',
-      width: 120,
-      render: (website: string | null) => (
-        website ? (
-          <a href={website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
-            <Tag color="blue">있음</Tag>
-          </a>
-        ) : (
-          <Tag color="default">없음</Tag>
-        )
-      ),
-    },
-    {
-      title: '상태',
-      dataIndex: 'is_active',
-      key: 'is_active',
-      width: 100,
-      render: (is_active: boolean) => (
-        <Tag color={is_active ? 'green' : 'red'}>
-          {is_active ? '활성' : '비활성'}
-        </Tag>
-      ),
-    },
-    {
-      title: (
-        <span 
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleSortChange('created_at')}
-        >
-          등록일
-          {sorting.sort_by === 'created_at' && (
-            <span style={{ marginLeft: 4 }}>
-              {sorting.sort_order === 'asc' ? '↑' : '↓'}
-            </span>
-          )}
-        </span>
-      ),
-      dataIndex: 'created_at',
-      key: 'created_at',
-      width: 120,
-      render: (date: string) => new Date(date).toLocaleDateString('ko-KR'),
-    },
-  ];
 
   return (
     <div>
@@ -259,24 +150,115 @@ const Investors: React.FC = () => {
         </Space>
       </Card>
 
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={investors}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} / 총 ${total}개`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 800 }}
-        />
+      <Card
+        title={`투자사 목록 (총 ${total}개)`}
+        style={{ height: 'calc(100vh - 200px)' }}
+        bodyStyle={{ 
+          height: 'calc(100vh - 280px)', 
+          overflowY: 'auto',
+          padding: '16px'
+        }}
+      >
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '50px 0' }}>
+            <Spin size="large" />
+          </div>
+        ) : investors.length > 0 ? (
+          <Row gutter={[16, 16]}>
+            {investors.map((investor) => (
+              <Col key={investor.id} xs={24} sm={12} md={8} lg={6} xl={6}>
+                <Card
+                  hoverable
+                  style={{
+                    height: '100%',
+                    cursor: 'pointer',
+                    border: investor.is_active ? '1px solid #d9d9d9' : '1px solid #ffccc7'
+                  }}
+                  onClick={() => handleInvestorClick(investor.id)}
+                  bodyStyle={{ padding: '16px' }}
+                >
+                  <div style={{ marginBottom: '12px' }}>
+                    <div style={{ 
+                      fontWeight: 'bold', 
+                      fontSize: '16px',
+                      color: '#1890ff',
+                      marginBottom: '4px',
+                      overflow: 'hidden',
+                      textOverflow: 'ellipsis',
+                      whiteSpace: 'nowrap'
+                    }}>
+                      {investor.name}
+                    </div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>
+                      {investor.type}
+                    </div>
+                  </div>
+                  
+                  {investor.sectors && investor.sectors.length > 0 && (
+                    <div style={{ marginBottom: '12px' }}>
+                      {investor.sectors.slice(0, 2).map((sector, index) => (
+                        <Tag key={index} color="blue" style={{ marginBottom: '4px', fontSize: '11px' }}>
+                          {sector}
+                        </Tag>
+                      ))}
+                      {investor.sectors.length > 2 && (
+                        <Tag color="default" style={{ fontSize: '11px' }}>
+                          +{investor.sectors.length - 2}
+                        </Tag>
+                      )}
+                    </div>
+                  )}
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px' }}>
+                    <div>
+                      {investor.website ? (
+                        <a 
+                          href={investor.website} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          <GlobalOutlined style={{ color: '#1890ff', fontSize: '16px' }} />
+                        </a>
+                      ) : (
+                        <span style={{ color: '#d9d9d9' }}>-</span>
+                      )}
+                    </div>
+                    <Tag color={investor.is_active ? 'green' : 'red'} style={{ fontSize: '11px' }}>
+                      {investor.is_active ? '활성' : '비활성'}
+                    </Tag>
+                  </div>
+                </Card>
+              </Col>
+            ))}
+          </Row>
+        ) : (
+          <div style={{ textAlign: 'center', padding: '50px 0', color: '#999' }}>
+            투자사가 없습니다.
+          </div>
+        )}
+        
+        {!loading && investors.length > 0 && (
+          <div style={{ marginTop: '24px', textAlign: 'center' }}>
+            <Space>
+              <Button
+                disabled={pagination.current === 1}
+                onClick={() => setPagination({ ...pagination, current: pagination.current - 1 })}
+              >
+                이전
+              </Button>
+              <span>
+                {((pagination.current - 1) * pagination.pageSize + 1)} - {Math.min(pagination.current * pagination.pageSize, total)} / 총 {total}개
+              </span>
+              <Button
+                disabled={pagination.current * pagination.pageSize >= total}
+                onClick={() => setPagination({ ...pagination, current: pagination.current + 1 })}
+              >
+                다음
+              </Button>
+            </Space>
+          </div>
+        )}
       </Card>
 
       <InvestorDetailModal
