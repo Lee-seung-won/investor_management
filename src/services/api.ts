@@ -9,9 +9,9 @@ const getApiBaseUrl = () => {
     return customUrl;
   }
   
-  // Vercel 배포 환경에서는 Railway URL을 직접 사용
+  // Vercel 배포 환경에서는 프록시를 통해 같은 도메인으로 요청
   if (window.location.hostname.includes('vercel.app')) {
-    return 'https://web-production-7d32.up.railway.app';
+    return '';  // 상대 경로 사용 (프록시를 통해 자동으로 Railway로 전달)
   }
   
   switch (env) {
@@ -19,7 +19,8 @@ const getApiBaseUrl = () => {
       return 'http://localhost:8000';
     case 'production':
     default:
-      return 'https://web-production-7d32.up.railway.app';
+      // 프로덕션에서도 프록시 사용 (Vercel 배포 시)
+      return '';
   }
 };
 
