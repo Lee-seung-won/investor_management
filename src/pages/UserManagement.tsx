@@ -11,7 +11,7 @@ interface User {
   is_active: boolean;
   permissions?: {
     access_reports: boolean;
-    view_report_detail: boolean;
+    access_report_collection: boolean;
     collect_fund_news: boolean;
     refresh_all_funds: boolean;
     access_labeling: boolean;
@@ -24,7 +24,7 @@ interface User {
 
 const PERMISSION_LABELS: { [key: string]: string } = {
   access_reports: '보고서 페이지 접근',
-  view_report_detail: '보고서 상세보기',
+  access_report_collection: '보고서 수집 페이지 접근',
   collect_fund_news: '펀드뉴스수집',
   refresh_all_funds: '전체펀드정보 갱신',
   access_labeling: '라벨링 페이지 접근',

@@ -7,7 +7,7 @@ interface User {
   is_active: boolean;
   permissions: {
     access_reports: boolean;
-    view_report_detail: boolean;
+    access_report_collection: boolean;
     collect_fund_news: boolean;
     refresh_all_funds: boolean;
     access_labeling: boolean;

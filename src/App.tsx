@@ -30,6 +30,7 @@ import CrawlingFailedDomains from './pages/CrawlingFailedDomains';
 import ProfileManagement from './pages/ProfileManagement';
 import NewsCollection from './pages/NewsCollection';
 import FundArticles from './pages/FundArticles';
+import ReportCollection from './pages/ReportCollection';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import NotFound from './pages/NotFound';
@@ -134,6 +135,12 @@ const AppContent: React.FC = () => {
       label: '뉴스 수집',
     },
     {
+      key: '/report-collection',
+      icon: hasPermission('access_report_collection') ? <CloudDownloadOutlined /> : <LockOutlined />,
+      label: '보고서 수집',
+      style: hasPermission('access_report_collection') ? {} : { color: '#722ed1' },
+    },
+    {
       key: '/investments',
       icon: <DollarOutlined />,
       label: '투자 정보',
@@ -181,6 +188,10 @@ const AppContent: React.FC = () => {
     // 권한 체크
     if (key === '/reports' && !hasPermission('access_reports')) {
       message.warning('보고서 페이지 접근 권한이 없습니다.');
+      return;
+    }
+    if (key === '/report-collection' && !hasPermission('access_report_collection')) {
+      message.warning('보고서 수집 페이지 접근 권한이 없습니다.');
       return;
     }
     if (key === '/labeling' && !hasPermission('access_labeling')) {
@@ -256,6 +267,15 @@ const AppContent: React.FC = () => {
             <PrivateRoute path="/investors" component={Investors} />
             <PrivateRoute path="/articles" component={Articles} />
             <PrivateRoute path="/news-collection" component={NewsCollection} />
+            <Route 
+              path="/report-collection" 
+              render={() => {
+                if (!hasPermission('access_report_collection')) {
+                  return <NotFound />;
+                }
+                return <ReportCollection />;
+              }} 
+            />
             <PrivateRoute path="/investments" component={Investments} />
             <PrivateRoute path="/funds" component={Funds} />
             <PrivateRoute path="/fund-articles" component={FundArticles} />
