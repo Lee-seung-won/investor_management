@@ -125,6 +125,14 @@ export const reportsAPI = {
   syncAllFundsFromReports: () => api.post('/api/reports/sync-all-funds'),
 };
 
+// 보고서 수집 관련 API
+export const reportCollectionAPI = {
+  getStatus: () => api.get('/api/collect-reports/status'),
+  startCollection: (params?: { limit?: number; skip?: number; retry_failed?: boolean; investor_id?: number; resume?: boolean }) => 
+    api.post('/api/collect-reports', params || {}),
+  stopCollection: () => api.post('/api/collect-reports/stop', {}),
+};
+
 // 투자 정보 관련 API
 export const investmentsAPI = {
   getInvestments: (params?: any) => api.get('/api/investments/', { params }),
