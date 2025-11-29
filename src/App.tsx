@@ -1,6 +1,6 @@
 import React from 'react';
-import { BrowserRouter as Router, Route, Switch, useHistory, useLocation } from 'react-router-dom';
-import { Layout, Menu, Button, Space, Typography } from 'antd';
+import { BrowserRouter as Router, Route, Switch, useHistory, useLocation, Redirect } from 'react-router-dom';
+import { Layout, Menu, Button, Space, Typography, Spin, message } from 'antd';
 import {
   DashboardOutlined,
   BankOutlined,
@@ -9,6 +9,8 @@ import {
   FundOutlined,
   TagOutlined,
   ApiOutlined,
+  FileSearchOutlined,
+  CloudDownloadOutlined,
   UserOutlined,
   LogoutOutlined
 } from '@ant-design/icons';
@@ -18,19 +20,86 @@ import Investors from './pages/Investors';
 import Articles from './pages/Articles';
 import Investments from './pages/Investments';
 import Funds from './pages/Funds';
+import OtherActivities from './pages/OtherActivities';
 import Labeling from './pages/Labeling';
 import APIDocs from './pages/APIDocs';
-import LoginModal from './components/LoginModal';
-import { UserProvider, useUser } from './contexts/UserContext';
+import Reports from './pages/Reports';
+import ReportView from './pages/ReportView';
+import Blacklist from './pages/Blacklist';
+import CrawlingFailedDomains from './pages/CrawlingFailedDomains';
+import ProfileManagement from './pages/ProfileManagement';
+import NewsCollection from './pages/NewsCollection';
+import FundArticles from './pages/FundArticles';
+import Login from './pages/Login';
+import UserManagement from './pages/UserManagement';
+import NotFound from './pages/NotFound';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
+import { usePermissions } from './utils/permissions';
+import { LockOutlined } from '@ant-design/icons';
 
-const { Header, Sider, Content } = Layout;
+const { Sider, Content, Header } = Layout;
 const { Text } = Typography;
+
+// PrivateRoute 컴포넌트 - 인증된 사용자만 접근 가능
+const PrivateRoute: React.FC<{ path: string; exact?: boolean; component: React.ComponentType<any> }> = ({ 
+  path, 
+  exact, 
+  component: Component 
+}) => {
+  return (
+    <Route 
+      path={path} 
+      exact={exact}
+      render={(props) => <Component {...props} />}
+    />
+  );
+};
+
+// AdminRoute 컴포넌트 - 어드민만 접근 가능
+const AdminRoute: React.FC<{ path: string; exact?: boolean; component: React.ComponentType<any> }> = ({ 
+  path, 
+  exact, 
+  component: Component 
+}) => {
+  const { user } = useAuth();
+  
+  return (
+    <Route 
+      path={path} 
+      exact={exact}
+      render={(props) => {
+        // 어드민이 아니면 404 페이지 표시
+        if (user?.role !== 'admin') {
+          return <NotFound />;
+        }
+        return <Component {...props} />;
+      }}
+    />
+  );
+};
 
 const AppContent: React.FC = () => {
   const history = useHistory();
   const location = useLocation();
-  const { user, login, logout, isLoggedIn } = useUser();
-  const [showLoginModal, setShowLoginModal] = React.useState(false);
+  const { user, loading, logout } = useAuth();
+  const { hasPermission } = usePermissions();
+
+  // 인증 확인 중일 때는 로딩 화면 표시
+  if (loading) {
+    return (
+      <div style={{ 
+        display: 'flex', 
+        flexDirection: 'column',
+        justifyContent: 'center', 
+        alignItems: 'center', 
+        minHeight: '100vh',
+        background: '#f0f2f5'
+      }}>
+        <Spin size="large" />
+        <div style={{ marginTop: 16, color: '#666' }}>인증 확인 중...</div>
+      </div>
+    );
+  }
 
   const menuItems = [
     {
@@ -44,9 +113,25 @@ const AppContent: React.FC = () => {
       label: '투자사',
     },
     {
+      key: '/profile-management',
+      icon: hasPermission('access_profile_management') ? <UserOutlined /> : <LockOutlined />,
+      label: '프로필 관리',
+      style: hasPermission('access_profile_management') ? {} : { color: '#722ed1' },
+    },
+    {
       key: '/articles',
       icon: <FileTextOutlined />,
       label: '뉴스 기사',
+    },
+    {
+      key: '/fund-articles',
+      icon: <FileTextOutlined />,
+      label: '펀드 기사',
+    },
+    {
+      key: '/news-collection',
+      icon: <CloudDownloadOutlined />,
+      label: '뉴스 수집',
     },
     {
       key: '/investments',
@@ -59,98 +144,161 @@ const AppContent: React.FC = () => {
       label: '펀드 정보',
     },
     {
-      key: '/labeling',
+      key: '/other-activities',
       icon: <TagOutlined />,
+      label: '활동 이력',
+    },
+    {
+      key: '/reports',
+      icon: hasPermission('access_reports') ? <FileSearchOutlined /> : <LockOutlined />,
+      label: '보고서',
+      style: hasPermission('access_reports') ? {} : { color: '#722ed1' },
+    },
+    {
+      key: '/labeling',
+      icon: hasPermission('access_labeling') ? <TagOutlined /> : <LockOutlined />,
       label: '라벨링',
+      style: hasPermission('access_labeling') ? {} : { color: '#722ed1' },
     },
     {
       key: '/api-docs',
-      icon: <ApiOutlined />,
+      icon: hasPermission('access_api_docs') ? <ApiOutlined /> : <LockOutlined />,
       label: 'API 문서',
+      style: hasPermission('access_api_docs') ? {} : { color: '#722ed1' },
     },
   ];
 
+  // 어드민인 경우 접근 관리 메뉴 추가
+  if (user?.role === 'admin') {
+    menuItems.push({
+      key: '/user-management',
+      icon: <UserOutlined />,
+      label: '접근 관리',
+    });
+  }
+
   const handleMenuClick = ({ key }: { key: string }) => {
+    // 권한 체크
+    if (key === '/reports' && !hasPermission('access_reports')) {
+      message.warning('보고서 페이지 접근 권한이 없습니다.');
+      return;
+    }
+    if (key === '/labeling' && !hasPermission('access_labeling')) {
+      message.warning('라벨링 페이지 접근 권한이 없습니다.');
+      return;
+    }
+    if (key === '/api-docs' && !hasPermission('access_api_docs')) {
+      message.warning('API 문서 페이지 접근 권한이 없습니다.');
+      return;
+    }
+    if (key === '/profile-management' && !hasPermission('access_profile_management')) {
+      message.warning('프로필 관리 페이지 접근 권한이 없습니다.');
+      return;
+    }
     history.push(key);
   };
 
-  const handleLogin = (userData: { id: number; name: string }) => {
-    // UserContext의 login 함수 호출
-    login(userData);
-    setShowLoginModal(false);
+  const handleLogout = async () => {
+    await logout();
+    history.push('/login');
   };
 
-  const handleLogout = () => {
-    logout();
-  };
+  // 로그인 페이지는 인증 확인 없이 바로 표시
+  if (location.pathname === '/login') {
+    return (
+      <Switch>
+        <Route path="/login" component={Login} />
+        <Redirect to="/login" />
+      </Switch>
+    );
+  }
 
-  // 로그인하지 않은 경우 로그인 모달 표시
-  React.useEffect(() => {
-    if (!isLoggedIn) {
-      setShowLoginModal(true);
-    }
-  }, [isLoggedIn]);
+  // 로그인하지 않은 경우 로그인 페이지로 리다이렉트
+  if (!user) {
+    return <Redirect to="/login" />;
+  }
 
   return (
     <Layout style={{ minHeight: '100vh' }}>
-      <Sider width={200} theme="light">
-        <div className="logo">
-          투자사 뉴스 분석
+      <Sider width={200} theme="light" style={{ display: 'flex', flexDirection: 'column' }}>
+        <div className="logo" style={{ padding: '16px', display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'center' }}>
+          <img src="/icon.png" alt="The Substrata" style={{ width: '24px', height: '24px' }} />
+          <span style={{ fontWeight: 600, fontSize: '16px', color: '#001529' }}>The Substrata</span>
         </div>
         <Menu
           mode="inline"
           selectedKeys={[location.pathname]}
           items={menuItems}
           onClick={handleMenuClick}
-          style={{ height: '100%', borderRight: 0 }}
+          style={{ flex: 1, borderRight: 0, overflowY: 'auto' }}
         />
+        <div style={{ padding: '16px', borderTop: '1px solid #f0f0f0' }}>
+          <Space direction="vertical" style={{ width: '100%' }}>
+            <Text strong>{user?.username}</Text>
+            <Text type="secondary" style={{ fontSize: '12px' }}>
+              {user?.role === 'admin' ? '어드민' : '직원'}
+            </Text>
+            <Button
+              type="link"
+              icon={<LogoutOutlined />}
+              onClick={handleLogout}
+              style={{ padding: 0, width: '100%', textAlign: 'left' }}
+            >
+              로그아웃
+            </Button>
+          </Space>
+        </div>
       </Sider>
       <Layout>
-        <Header style={{ background: '#fff', padding: '0 24px', boxShadow: '0 2px 8px rgba(0,0,0,0.1)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <h1 style={{ margin: 0, color: '#001529' }}>투자사 기반 스타트업 뉴스 분석 시스템</h1>
-          {isLoggedIn && user && (
-            <Space>
-              <Text>
-                <UserOutlined /> {user.name}
-              </Text>
-              <Button 
-                type="text" 
-                icon={<LogoutOutlined />} 
-                onClick={handleLogout}
-              >
-                로그아웃
-              </Button>
-            </Space>
-          )}
-        </Header>
-        <Content style={{ padding: '24px', background: '#f0f2f5' }}>
+        <Content style={{ padding: '24px', background: '#f0f2f5', minHeight: '100vh' }}>
           <Switch>
-            <Route exact path="/" component={Dashboard} />
-            <Route path="/investors" component={Investors} />
-            <Route path="/articles" component={Articles} />
-            <Route path="/investments" component={Investments} />
-            <Route path="/funds" component={Funds} />
-            <Route path="/labeling" component={Labeling} />
-            <Route path="/api-docs" component={APIDocs} />
+            <PrivateRoute exact path="/" component={Dashboard} />
+            <PrivateRoute path="/investors" component={Investors} />
+            <PrivateRoute path="/articles" component={Articles} />
+            <PrivateRoute path="/news-collection" component={NewsCollection} />
+            <PrivateRoute path="/investments" component={Investments} />
+            <PrivateRoute path="/funds" component={Funds} />
+            <PrivateRoute path="/fund-articles" component={FundArticles} />
+            <PrivateRoute path="/other-activities" component={OtherActivities} />
+            <PrivateRoute exact path="/reports" component={Reports} />
+            <PrivateRoute path="/reports/view/:investorId" component={ReportView} />
+            <PrivateRoute path="/labeling" component={Labeling} />
+            <Route 
+              path="/api-docs" 
+              render={() => {
+                if (!hasPermission('access_api_docs')) {
+                  return <NotFound />;
+                }
+                return <APIDocs />;
+              }} 
+            />
+            <PrivateRoute path="/blacklist" component={Blacklist} />
+            <PrivateRoute path="/crawling-failed-domains" component={CrawlingFailedDomains} />
+            <Route 
+              path="/profile-management" 
+              render={() => {
+                if (!hasPermission('access_profile_management')) {
+                  return <NotFound />;
+                }
+                return <ProfileManagement />;
+              }} 
+            />
+            <Route path="/user-management" render={() => user.role === 'admin' ? <UserManagement /> : <NotFound />} />
+            <Route component={NotFound} />
           </Switch>
         </Content>
       </Layout>
-      
-      <LoginModal
-        visible={showLoginModal}
-        onLogin={handleLogin}
-      />
     </Layout>
   );
 };
 
 const App: React.FC = () => {
   return (
-    <UserProvider>
-      <Router>
+    <Router>
+      <AuthProvider>
         <AppContent />
-      </Router>
-    </UserProvider>
+      </AuthProvider>
+    </Router>
   );
 };
 

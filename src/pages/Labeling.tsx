@@ -13,17 +13,20 @@ import {
   Modal,
   Typography,
   Select,
-  Spin
+  Spin,
+  Result
 } from 'antd';
 import { 
   DeleteOutlined, 
   TagOutlined, 
   BarChartOutlined,
   ReloadOutlined,
-  DownloadOutlined
+  DownloadOutlined,
+  HomeOutlined
 } from '@ant-design/icons';
 import { labelingAPI } from '../services/api.ts';
-import { useUser } from '../contexts/UserContext';
+import { usePermissions } from '../utils/permissions';
+import { useHistory } from 'react-router-dom';
 
 const { Option } = Select;
 const { Text, Title } = Typography;
@@ -86,7 +89,8 @@ const LABEL_OPTIONS = [
 ];
 
 const Labeling: React.FC = () => {
-  const { user } = useUser();
+  const history = useHistory();
+  const { hasPermission } = usePermissions();
   const [articles, setArticles] = useState<Article[]>([]);
   const [loading, setLoading] = useState(false);
   const [stats, setStats] = useState<LabelingStats | null>(null);
@@ -142,7 +146,7 @@ const Labeling: React.FC = () => {
       await labelingAPI.createLabelingDataBatch({
         article_id: selectedArticle.id,
         sentence_index: sentenceIndex,
-        user_id: user?.id,
+        user_id: null,
         tokens: tokens.map(token => ({
           token_index: token.token_index,
           token_text: token.token_text,
@@ -288,6 +292,22 @@ const Labeling: React.FC = () => {
       )
     }
   ];
+
+  // 권한 체크
+  if (!hasPermission('access_labeling')) {
+    return (
+      <Result
+        status="403"
+        title="403"
+        subTitle="라벨링 페이지 접근 권한이 없습니다."
+        extra={
+          <Button type="primary" icon={<HomeOutlined />} onClick={() => history.push('/')}>
+            홈으로 돌아가기
+          </Button>
+        }
+      />
+    );
+  }
 
   return (
     <div style={{ padding: '24px' }}>
