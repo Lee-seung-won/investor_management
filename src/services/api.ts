@@ -32,6 +32,7 @@ console.log(`🔧 Environment: ${process.env.REACT_APP_ENVIRONMENT || 'productio
 const api = axios.create({
   baseURL: API_BASE_URL,
   timeout: 30000,  // 타임아웃을 30초로 증가
+  withCredentials: true,  // 쿠키 전송을 위해 필요
 });
 
 // 요청 인터셉터
@@ -51,6 +52,13 @@ api.interceptors.response.use(
   },
   (error) => {
     console.error('API Error:', error);
+    // 401 에러인 경우 (비활성화, 세션 만료 등)
+    if (error.response?.status === 401 && !window.location.pathname.includes('/login')) {
+      // 세션 쿠키 삭제
+      document.cookie = 'session_id=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
+      // 로그인 페이지로 리다이렉트
+      window.location.href = '/login';
+    }
     return Promise.reject(error);
   }
 );
@@ -69,6 +77,18 @@ export const investorsAPI = {
     api.get(`/api/investors/${id}/fund-history`, { params }),
   getSectorStats: () => api.get('/api/investors/stats/sectors'),
   getArticleCounts: () => api.get('/api/investors/stats/articles'),
+  getInvestorUnprocessedArticleCounts: (params?: any) => 
+    api.get('/api/investors/stats/unprocessed-articles', { params }),
+  getInvestorFundArticleCounts: (params?: any) => 
+    api.get('/api/investors/stats/fund-articles', { params }),
+  getInvestorInvestmentCounts: (params?: any) => 
+    api.get('/api/investors/stats/investment-counts', { params }),
+  getInvestorFundCounts: (params?: any) => 
+    api.get('/api/investors/stats/fund-counts', { params }),
+  getInvestorOtherActivityCounts: (params?: any) => 
+    api.get('/api/investors/stats/other-activity-counts', { params }),
+  getInvestorOtherActivities: (investorId: number, params?: any) => 
+    api.get(`/api/investors/${investorId}/other-activities`, { params }),
   updateInvestor: (id: number, data: any) => api.put(`/api/investors/${id}`, data),
 };
 
@@ -82,6 +102,27 @@ export const articlesAPI = {
   markArticleProcessed: (id: number) => api.post(`/api/articles/${id}/mark-processed`),
   getSourceStats: () => api.get('/api/articles/stats/sources'),
   updateArticleContent: (id: number, content: string) => api.put(`/api/articles/${id}/content`, { content }),
+  analyzeArticle: (id: number, forceType?: string) => {
+    const params = forceType ? { force_type: forceType } : {};
+    return api.post(`/api/articles/${id}/analyze`, null, { params });
+  },
+  getFundArticles: (params?: any) => api.get('/api/articles/fund-articles', { params }),
+  getCollectionAnalysis: (date: string) => {
+    if (!date || typeof date !== 'string') {
+      throw new Error('날짜가 필요합니다.');
+    }
+    return api.get('/api/articles/collection-analysis', { params: { date: date.trim() } });
+  },
+};
+
+// 보고서 관련 API
+export const reportsAPI = {
+  getReports: (params?: any) => api.get('/api/reports/', { params }),
+  getInvestorsWithReports: (params?: any) => api.get('/api/reports/investors', { params }),
+  getInvestorReport: (investorId: number) => api.get(`/api/reports/investor/${investorId}`),
+  getReportDetail: (reportId: number) => api.get(`/api/reports/${reportId}`),
+  syncFundsFromReport: (investorId: number) => api.post(`/api/reports/investor/${investorId}/sync-funds`),
+  syncAllFundsFromReports: () => api.post('/api/reports/sync-all-funds'),
 };
 
 // 투자 정보 관련 API
@@ -120,8 +161,19 @@ export const fundsAPI = {
   createFund: (data: any) => api.post('/api/funds/', data),
   getFunds: (params?: any) => api.get('/api/funds/', { params }),
   getArticleFunds: (articleId: number) => api.get(`/api/funds/article/${articleId}`),
+  getFundArticles: (fundId: number) => api.get(`/api/funds/${fundId}/articles`),
   updateFund: (fundId: number, data: any) => api.put(`/api/funds/${fundId}`, data),
-  deleteFund: (fundId: number) => api.delete(`/api/funds/${fundId}`),
+  deleteFund: (fundId: number) => api.delete(`/api/funds/${fundId}`),  // 펀드 자체 삭제
+  unlinkFundFromArticle: (articleId: number, fundId: number) => api.delete(`/api/funds/article/${articleId}/fund/${fundId}`),  // 기사에서 펀드 연결 해제
+};
+
+// 기타 활동 관련 API
+export const otherActivitiesAPI = {
+  createOtherActivity: (data: any) => api.post('/api/other-activities/', data),
+  getOtherActivities: (params?: any) => api.get('/api/other-activities/', { params }),
+  getArticleOtherActivities: (articleId: number) => api.get(`/api/other-activities/article/${articleId}`),
+  updateOtherActivity: (activityId: number, data: any) => api.put(`/api/other-activities/${activityId}`, data),
+  deleteOtherActivity: (activityId: number) => api.delete(`/api/other-activities/${activityId}`),
 };
 
 // 라벨링 관련 API
@@ -138,8 +190,11 @@ export const labelingAPI = {
 // 뉴스 수집 관련 API
 export const newsCollectionAPI = {
   getStatus: () => api.get('/api/collect-news/status'),
-  startCollection: (user_id: number, limit: number = 10, resume: boolean = false) => api.post('/api/collect-news', { user_id, limit, resume }),
-  stopCollection: (user_id: number) => api.post('/api/collect-news/stop', { user_id }),
+  startCollection: (user_id: number | null, limit: number = 10, resume: boolean = false) => api.post('/api/collect-news', { user_id, limit, resume }),
+  stopCollection: (user_id: number | null) => api.post('/api/collect-news/stop', { user_id }),
+  startFundCollection: (limit_per_fund: number = 3, resume: boolean = false) => api.post('/api/collect-fund-news', { limit_per_fund, resume }),
+  stopFundCollection: () => api.post('/api/collect-fund-news/stop', {}),
+  getFundCollectionStatus: () => api.get('/api/collect-fund-news/status'),
 };
 
 // 뉴스 소스 관련 API
@@ -167,10 +222,46 @@ export const matchingAPI = {
 
 // 사용자 인증 및 활동 로그 API
 export const authAPI = {
-  login: (name: string) => api.post('/api/auth/login', { name }),
-  getCurrentUser: (userId: number) => api.get('/api/auth/current-user', { params: { user_id: userId } }),
-  getActivityLogs: (userId?: number, limit?: number) => api.get('/api/auth/activity-logs', { params: { user_id: userId, limit } }),
+  login: (username: string, password: string) => api.post('/api/auth/login', { username, password }, { withCredentials: true }),
+  logout: () => api.post('/api/auth/logout', {}, { withCredentials: true }),
+  getCurrentUser: () => api.get('/api/auth/me', { withCredentials: true }),
 };
+
+// 사용자 관리 API (어드민 전용)
+export const userManagementAPI = {
+  getUsers: () => api.get('/api/user-management/users', { withCredentials: true }),
+  createUser: (data: { username: string; password: string; role: string }) => 
+    api.post('/api/user-management/users', data, { withCredentials: true }),
+  updatePassword: (userId: number, newPassword: string) => 
+    api.put('/api/user-management/users/password', { user_id: userId, new_password: newPassword }, { withCredentials: true }),
+  toggleUserStatus: (userId: number, isActive: boolean) => 
+    api.put('/api/user-management/users/status', { user_id: userId, is_active: isActive }, { withCredentials: true }),
+  updatePermissions: (userId: number, permissions: any) => 
+    api.put('/api/user-management/users/permissions', { user_id: userId, permissions }, { withCredentials: true }),
+};
+
+// 블랙리스트 API
+export const blacklistAPI = {
+  getBlacklists: (skip?: number, limit?: number) => api.get('/api/blacklist', { params: { skip, limit } }),
+  getArticleCount: (domain: string) => api.get('/api/blacklist/article-count', { params: { domain } }),
+  createBlacklist: (domain: string, reason?: string, created_by?: string, delete_articles?: boolean) => 
+    api.post('/api/blacklist', { domain, reason, created_by }, { params: { delete_articles: delete_articles ?? true } }),
+  deleteBlacklist: (blacklistId: number) => api.delete(`/api/blacklist/${blacklistId}`),
+};
+
+// 크롤링 실패 예상 주소 API
+export const crawlingFailedDomainsAPI = {
+  getCrawlingFailedDomains: (skip?: number, limit?: number) => api.get('/api/crawling-failed-domains', { params: { skip, limit } }),
+  deleteCrawlingFailedDomain: (domainId: number) => api.delete(`/api/crawling-failed-domains/${domainId}`),
+};
+
+// 프로필 관리 API
+export const profileManagementAPI = {
+  getStatus: () => api.get('/api/profile-management/status'),
+  startDetection: (resume: boolean = false) => api.post('/api/profile-management/start', { resume }),
+  stopDetection: () => api.post('/api/profile-management/stop', {}),
+};
+
 
 
 export default api;
