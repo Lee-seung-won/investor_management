@@ -3,6 +3,7 @@ export interface Investor {
   name: string;
   type: string;
   description?: string;
+  profile_text?: string;  // AC Processor가 생성한 임베딩용 프로필 텍스트
   website?: string;
   contact?: string;
   email?: string;
@@ -24,6 +25,7 @@ export interface Article {
   scraped_at: string;
   is_processed: boolean;
   processing_status: string;
+  type?: string | null;  // 'investment' | 'fund' | 'otheractivity' | 'trash' | null
   additional_info: Record<string, any>;
   search_investor_id?: number;
   search_query?: string;

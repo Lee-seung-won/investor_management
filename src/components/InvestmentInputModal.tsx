@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Modal, Form, Input, Select, Button, message, Space, Row, Col, Card, Typography, Spin, Radio, DatePicker } from 'antd';
+import { Modal, Form, Input, Select, Button, message, Space, Row, Col, Card, Typography, Spin, Radio, DatePicker, List, Tag } from 'antd';
+import { EyeOutlined } from '@ant-design/icons';
 import { Article } from '../types/index';
-import { investmentsAPI, articlesAPI, fundsAPI, investorsAPI } from '../services/api.ts';
-import { useUser } from '../contexts/UserContext';
+import { investmentsAPI, articlesAPI, fundsAPI, investorsAPI, otherActivitiesAPI } from '../services/api.ts';
+import dayjs from 'dayjs';
 
 const { Option } = Select;
 const { Text } = Typography;
@@ -24,15 +25,20 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   investorName,
   searchInvestorId
 }) => {
-  const { user } = useUser();
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [scrapingContent, setScrapingContent] = useState(false);
   const [articleContent, setArticleContent] = useState(article?.content || '');
-  const [investmentType, setInvestmentType] = useState<'investment' | 'fund' | 'none'>('investment');
+  const [investmentType, setInvestmentType] = useState<'investment' | 'fund' | 'others' | 'none'>('none');
   const [showManualInput, setShowManualInput] = useState(false);
   const [manualContent, setManualContent] = useState('');
   const [amountDisplay, setAmountDisplay] = useState('');
+  const [analyzing, setAnalyzing] = useState(false);
+  const [llmResult, setLlmResult] = useState<any>(null);
+  const [showFundList, setShowFundList] = useState(false);
+  const [investorFunds, setInvestorFunds] = useState<any[]>([]);
+  const [loadingFunds, setLoadingFunds] = useState(false);
+  const [articleInvestorName, setArticleInvestorName] = useState<string>('');
 
   // 숫자를 한글로 변환하는 함수
   const convertNumberToKorean = (num: string): string => {
@@ -136,24 +142,99 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
     return result.join('');
   };
 
-  // 투자 유형이 변경될 때 폼 초기화 및 추출된 정보 적용
-  const handleInvestmentTypeChange = (value: 'investment' | 'fund' | 'none') => {
+  // 투자 유형이 변경될 때 폼 초기화 및 LLM 분석 실행
+  const handleInvestmentTypeChange = async (value: 'investment' | 'fund' | 'others' | 'none') => {
     setInvestmentType(value);
     form.resetFields();
     setAmountDisplay(''); // 한글 표시 초기화
     
-    // 추출된 정보가 있으면 새 유형에 맞게 적용
-    if (extractedInfo.round || extractedInfo.sector || extractedInfo.amount) {
-      applyExtractedInfoToForm(extractedInfo);
+    // 'none'이 아니고 기사 본문이 있으면 자동으로 LLM 분석 실행
+    if (value !== 'none' && article?.id && articleContent && articleContent.trim()) {
+      await handleLLMAnalyzeWithType(value);
     }
   };
 
-  // article이 변경될 때 articleContent 업데이트
-  useEffect(() => {
-    if (article?.content) {
-      setArticleContent(article.content);
+  // 특정 유형으로 LLM 분석 실행
+  const handleLLMAnalyzeWithType = async (type: 'investment' | 'fund' | 'others') => {
+    if (!article?.id) {
+      message.warning('기사 정보가 없습니다.');
+      return;
     }
-  }, [article]);
+
+    if (!articleContent || !articleContent.trim()) {
+      message.warning('기사 본문이 없습니다. 먼저 본문을 가져오세요.');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      // force_type 매핑
+      const forceTypeMap = {
+        'investment': 'INVESTMENT',
+        'fund': 'FUND',
+        'others': 'OTHERS'
+      };
+      
+      const response = await articlesAPI.analyzeArticle(article.id, forceTypeMap[type]);
+      
+      if (response.data.success && response.data.data) {
+        const result = response.data.data;
+        const isRelated = result.is_related !== undefined ? result.is_related : response.data.is_related_to_search_investor;
+        
+        // 강제 유형에 맞는 결과가 있으면 적용
+        if (result.type === forceTypeMap[type]) {
+          // 타입이 일치하면 is_related와 관계없이 적용 (사용자가 강제로 선택했으므로)
+          setLlmResult(result);
+          applyLLMResultToForm(result);
+          if (isRelated) {
+            message.success(`${type === 'investment' ? '투자 정보' : type === 'fund' ? '펀드 정보' : '기타 활동'} 정보를 추출했습니다.`);
+          } else {
+            message.info(`${type === 'investment' ? '투자 정보' : type === 'fund' ? '펀드 정보' : '기타 활동'} 정보를 찾았지만 관련성이 낮습니다. 확인 후 저장해주세요.`);
+          }
+        } else if (result.type === 'NONE') {
+          // 정보를 찾지 못했지만, 사용자가 강제로 선택한 유형이므로 해당 폼을 활성화하고 수동 입력 가능하도록 함
+          message.info(`${type === 'investment' ? '투자 정보' : type === 'fund' ? '펀드 정보' : '기타 활동'} 정보를 자동으로 찾지 못했습니다. 수동으로 입력해주세요.`);
+          // LLM 결과는 저장하지 않고, 해당 유형의 폼만 활성화된 상태로 유지
+        } else {
+          // 다른 유형이 반환된 경우 - 하지만 사용자가 강제로 선택했으므로 해당 유형으로 처리
+          // LLM이 다른 유형을 찾았어도, 사용자가 선택한 유형의 폼은 활성화되어 있으므로 수동 입력 가능
+          message.warning(`LLM은 이 기사를 ${result.type === 'INVESTMENT' ? '투자 정보' : result.type === 'FUND' ? '펀드 정보' : '기타 활동'} 유형으로 분류했습니다. 원하시는 유형으로 수동 입력해주세요.`);
+        }
+      } else {
+        message.error('기사 분석에 실패했습니다.');
+      }
+    } catch (error: any) {
+      console.error('LLM 분석 오류:', error);
+      const errorMessage = error?.response?.data?.detail || error?.message || '알 수 없는 오류';
+      message.error(`기사 분석 중 오류가 발생했습니다: ${errorMessage}`);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // 모달이 열릴 때 또는 article이 변경될 때 articleContent 초기화
+  useEffect(() => {
+    if (visible && article) {
+      // 모달이 열릴 때마다 해당 기사의 content로 초기화
+      // article.content가 null이거나 undefined일 때 빈 문자열로 처리
+      const content = article.content || '';
+      console.log(`모달 열림 - 기사 ID: ${article.id}, 본문 길이: ${content.length}`);
+      setArticleContent(content);
+      setShowManualInput(false);
+      setManualContent('');
+      setLlmResult(null); // LLM 결과도 초기화
+      setShowFundList(false); // 펀드 목록 초기화
+      setInvestorFunds([]); // 펀드 목록 데이터 초기화
+    } else if (!visible) {
+      // 모달이 닫힐 때 상태 초기화
+      setArticleContent('');
+      setShowManualInput(false);
+      setManualContent('');
+      setLlmResult(null);
+      setShowFundList(false);
+      setInvestorFunds([]);
+    }
+  }, [visible, article]);
 
   // 기사 본문 크롤링 함수
   const handleScrapeContent = async () => {
@@ -162,24 +243,43 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
     setScrapingContent(true);
     try {
       const response = await articlesAPI.scrapeArticleContent(article.id);
-      if (response.data.success) {
-        setArticleContent(response.data.content || article.content);
-        message.success('기사 본문이 성공적으로 업데이트되었습니다.');
+      console.log('크롤링 응답:', response.data);
+      
+      if (response.data.success && response.data.saved) {
+        // 크롤링 성공 및 저장 완료
+        const scrapedContent = response.data.content || '';
+        setArticleContent(scrapedContent);
+        // article prop도 업데이트
+        if (article) {
+          article.content = scrapedContent;
+        }
         setShowManualInput(false);
-      } else {
-        // 크롤링 실패해도 응답에 content가 있으면 사용
+        message.success(`기사 본문이 성공적으로 가져와졌습니다. (${response.data.content_length || scrapedContent.length}자)`);
+      } else if (response.data.success && !response.data.saved) {
+        // 크롤링은 성공했지만 저장되지 않음 (기존 본문이 더 긴 경우)
         if (response.data.content) {
           setArticleContent(response.data.content);
-          message.warning('크롤링에 실패했지만 기존 내용을 표시합니다.');
-          setShowManualInput(false);
+          message.warning(response.data.message || '크롤링된 내용이 기존 본문보다 짧아 저장하지 않았습니다.');
         } else {
+          message.warning(response.data.message || '크롤링에 실패했습니다.');
+          setShowManualInput(true);
+        }
+      } else {
+        // 크롤링 실패
+        if (response.data.content && response.data.content.trim()) {
+          // 크롤링된 내용이 있으면 표시 (저장은 안 됨)
+          setArticleContent(response.data.content);
+          message.warning(response.data.message || '크롤링에 실패했지만 일부 내용을 가져왔습니다.');
+        } else {
+          // 크롤링 실패, 본문 없음
           message.warning(response.data.message || '크롤링에 실패했습니다. 수동 입력을 사용하세요.');
           setShowManualInput(true);
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Content scraping error:', error);
-      message.error('기사 본문 크롤링 중 오류가 발생했습니다. 수동 입력을 사용하세요.');
+      const errorMessage = error?.response?.data?.detail || error?.message || '알 수 없는 오류';
+      message.error(`기사 본문 크롤링 중 오류가 발생했습니다: ${errorMessage}`);
       setShowManualInput(true);
     } finally {
       setScrapingContent(false);
@@ -188,22 +288,40 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
 
   // 수동 본문 입력 함수
   const handleManualContentSubmit = async () => {
-    if (manualContent.trim()) {
-      try {
-        // 데이터베이스에 본문 저장
-        if (article?.id) {
-          await articlesAPI.updateArticleContent(article.id, manualContent);
-        }
-        
+    if (!manualContent.trim()) {
+      message.warning('본문을 입력해주세요.');
+      return;
+    }
+    
+    if (!article?.id) {
+      message.error('기사 정보가 없습니다.');
+      return;
+    }
+    
+    try {
+      // 데이터베이스에 본문 저장
+      const response = await articlesAPI.updateArticleContent(article.id, manualContent);
+      console.log('본문 저장 응답:', response.data);
+      
+      if (response.data && response.data.saved) {
+        // 저장 성공
         setArticleContent(manualContent);
         setShowManualInput(false);
-        message.success('수동으로 입력한 본문이 적용되고 데이터베이스에 저장되었습니다.');
-      } catch (error) {
-        console.error('본문 저장 중 오류:', error);
-        message.error('본문 저장에 실패했습니다.');
+        setManualContent(''); // 수동 입력 필드 초기화
+        
+        // article prop도 업데이트 (부모 컴포넌트에 반영되도록)
+        if (article) {
+          article.content = manualContent;
+        }
+        
+        message.success(`본문이 저장되었습니다. (${response.data.content_length || manualContent.length}자)`);
+      } else {
+        message.warning('본문 저장 응답을 확인할 수 없습니다.');
       }
-    } else {
-      message.warning('본문을 입력해주세요.');
+    } catch (error: any) {
+      console.error('본문 저장 중 오류:', error);
+      const errorMessage = error?.response?.data?.detail || error?.message || '알 수 없는 오류';
+      message.error(`본문 저장에 실패했습니다: ${errorMessage}`);
     }
   };
 
@@ -211,6 +329,182 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
   const handleManualInputCancel = () => {
     setShowManualInput(false);
     setManualContent('');
+  };
+
+  // LLM으로 분석하기
+  const handleLLMAnalyze = async () => {
+    if (!article?.id) {
+      message.warning('기사 정보가 없습니다.');
+      return;
+    }
+
+    if (!articleContent || !articleContent.trim()) {
+      message.warning('기사 본문이 없습니다. 먼저 본문을 가져오세요.');
+      return;
+    }
+
+    setAnalyzing(true);
+    try {
+      const response = await articlesAPI.analyzeArticle(article.id);
+      
+      if (response.data.success && response.data.data) {
+        const result = response.data.data;
+        // LLM이 판단한 관련성 사용 (result.is_related 또는 response.data.is_related_to_search_investor)
+        const isRelated = result.is_related !== undefined ? result.is_related : response.data.is_related_to_search_investor;
+        const searchInvestorName = response.data.search_investor_name;
+        
+        // 관련성 검증 (LLM이 판단한 결과 사용)
+        // is_related가 false이거나 type이 "NONE"인 경우 자동으로 "상관없음" 처리
+        if ((!isRelated || result.type === 'NONE') && response.data.search_investor_id) {
+          // 검색 주체 투자자와 관련이 없으면 "상관없음" 처리
+          setInvestmentType('none');
+          setLlmResult(null);
+          form.resetFields();
+          message.warning(
+            `이 기사는 검색 주체 투자자(${searchInvestorName})와 관련이 없습니다. "상관없음"으로 처리됩니다.`
+          );
+          return;
+        }
+        
+        setLlmResult(result);
+        
+        // 결과를 폼에 자동 입력
+        applyLLMResultToForm(result);
+        
+        message.success('LLM 분석이 완료되었습니다. 결과를 확인하고 저장해주세요.');
+      } else {
+        message.error('분석 결과를 가져올 수 없습니다.');
+      }
+    } catch (error: any) {
+      console.error('LLM 분석 오류:', error);
+      const errorMessage = error.response?.data?.detail || error.message || 'LLM 분석 중 오류가 발생했습니다.';
+      message.error(errorMessage);
+    } finally {
+      setAnalyzing(false);
+    }
+  };
+
+  // LLM 결과를 폼에 적용
+  const applyLLMResultToForm = (result: any) => {
+    if (result.type === 'FUND') {
+      setInvestmentType('fund');
+      form.setFieldsValue({
+        fund_name: result.fund_name,
+        fund_sector: result.fund_sector || ''
+      });
+      // 즉시 업데이트를 위해 약간의 지연 후 확인
+      setTimeout(() => {
+        const currentFundName = form.getFieldValue('fund_name');
+        if (currentFundName !== result.fund_name) {
+          form.setFieldsValue({ fund_name: result.fund_name });
+        }
+      }, 50);
+    } else if (result.type === 'INVESTMENT') {
+      setInvestmentType('investment');
+      
+      // startup_names와 investor_names 배열 처리 (하위 호환성: startup_name도 지원)
+      let startupNames: string[] = [];
+      if (result.startup_names && Array.isArray(result.startup_names)) {
+        startupNames = result.startup_names;
+      } else if (result.startup_name) {
+        // 기존 형식 지원
+        startupNames = [result.startup_name];
+      }
+      
+      let investorNames: string[] = [];
+      if (result.investor_names && Array.isArray(result.investor_names)) {
+        investorNames = result.investor_names;
+      } else if (result.investor_name) {
+        // 기존 형식 지원
+        investorNames = [result.investor_name];
+      }
+      
+      // startup_sectors 배열 처리
+      let startupSectors: string[] = [];
+      if (result.startup_sectors && Array.isArray(result.startup_sectors)) {
+        startupSectors = result.startup_sectors;
+      } else if (result.startup_sector) {
+        // 기존 형식 지원
+        startupSectors = [result.startup_sector];
+      }
+      
+      // startup_names와 startup_sectors 길이 맞추기
+      if (startupSectors.length < startupNames.length) {
+        const lastSector = startupSectors[startupSectors.length - 1] || '';
+        while (startupSectors.length < startupNames.length) {
+          startupSectors.push(lastSector);
+        }
+      }
+      
+      // 여러 스타트업인 경우 금액은 null
+      let amountValue = '';
+      let numAmount = 0;
+      
+      if (startupNames.length === 1 && result.total_amount !== null && result.total_amount !== undefined) {
+        // 단일 스타트업인 경우에만 금액 처리
+        if (typeof result.total_amount === 'number') {
+          numAmount = result.total_amount;
+        } else if (typeof result.total_amount === 'string') {
+          const cleaned = result.total_amount.replace(/[^0-9]/g, '');
+          numAmount = cleaned ? parseInt(cleaned, 10) : 0;
+        }
+        
+        if (numAmount > 0) {
+          amountValue = numAmount.toLocaleString('ko-KR');
+        }
+      }
+      
+      // 폼에 값 설정 (쉼표로 구분된 문자열)
+      const formValues: any = {
+        startup_name: startupNames.join(', '),
+        investor_name: investorNames.length > 0 
+          ? investorNames.join(', ') 
+          : (form.getFieldValue('investor_name') || investorName || ''),
+        sector: startupSectors.join(', '),
+        round_type: result.round_stage || '',
+        currency: 'KRW',
+        investment_date: result.investment_date || '',
+        news_summary: result.news_summary || '',
+      };
+      
+      // amount 필드 추가 (단일 스타트업인 경우에만)
+      if (amountValue && startupNames.length === 1) {
+        formValues.amount = amountValue;
+      }
+      
+      // 모든 값을 한 번에 설정
+      form.setFieldsValue(formValues);
+      
+      // 강제로 리렌더링을 위해 약간의 지연 후 다시 설정
+      setTimeout(() => {
+        if (amountValue && startupNames.length === 1) {
+          form.setFieldValue('amount', amountValue);
+          const amountInput = document.querySelector('input[name="amount"]') as HTMLInputElement;
+          if (amountInput && amountInput.value !== amountValue) {
+            amountInput.value = amountValue;
+            const event = new Event('input', { bubbles: true });
+            amountInput.dispatchEvent(event);
+          }
+        }
+      }, 50);
+      
+      // 금액 한글 표시 업데이트 (단일 스타트업인 경우에만)
+      if (numAmount > 0 && startupNames.length === 1) {
+        const koreanAmount = convertNumberToKorean(String(numAmount));
+        setAmountDisplay(koreanAmount);
+      } else {
+        setAmountDisplay('');
+      }
+    } else if (result.type === 'OTHERS') {
+      setInvestmentType('others');
+      form.setFieldsValue({
+        others_ac_name: result.ac_name,
+        others_event_type: result.event_type,
+        others_related_company: result.related_company || '',
+        others_summary: result.summary,
+        others_date: result.date ? dayjs(result.date) : null,
+      });
+    }
   };
 
   // 기사 본문을 문장 단위로 분할하는 함수
@@ -226,180 +520,27 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
     return sentences;
   };
 
-  // 추출된 투자 정보를 하이라이트하는 함수
-  const highlightExtractedInfo = (sentence: string) => {
-    let highlightedText = sentence;
-    
-    // 추출된 투자사 정보 하이라이트
-    if (extractedInfo.investor) {
-      const regex = new RegExp(`(${extractedInfo.investor.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark style="background-color: #fff3cd; padding: 2px 4px; border-radius: 3px; font-weight: bold;">$1</mark>');
-    }
-    
-    // 추출된 라운드 정보 하이라이트
-    if (extractedInfo.round) {
-      const regex = new RegExp(`(${extractedInfo.round.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark style="background-color: #d4edda; padding: 2px 4px; border-radius: 3px; font-weight: bold;">$1</mark>');
-    }
-    
-    // 추출된 섹터 정보 하이라이트
-    if (extractedInfo.sector) {
-      const regex = new RegExp(`(${extractedInfo.sector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark style="background-color: #d1ecf1; padding: 2px 4px; border-radius: 3px; font-weight: bold;">$1</mark>');
-    }
-    
-    // 추출된 금액 정보 하이라이트
-    if (extractedInfo.amount) {
-      const regex = new RegExp(`(${extractedInfo.amount.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')})`, 'gi');
-      highlightedText = highlightedText.replace(regex, '<mark style="background-color: #f8d7da; padding: 2px 4px; border-radius: 3px; font-weight: bold;">$1</mark>');
-    }
-    
-    return highlightedText;
-  };
-
-  // 기사 본문에서 투자 정보를 자동 추출하는 함수
-  const extractInvestmentInfo = useCallback((content: string) => {
-    if (!content) return { round: '', sector: '', amount: '', investor: '' };
-
-    // 라운드 추출 (시드, 시리즈A, 시리즈B, 시리즈C, 프리A, 프리B 등)
-    const roundPatterns = [
-      /(시드\s*라운드?|시드\s*투자)/gi,
-      /(프리\s*[ABC]|프리\s*시리즈\s*[ABC])/gi,
-      /(시리즈\s*[ABC]|시리즈\s*[ABC]\s*라운드?)/gi,
-      /(라운드\s*[ABC]|라운드\s*투자)/gi,
-      /(투자\s*유치|투자\s*라운드)/gi
-    ];
-
-    let extractedRound = '';
-    for (const pattern of roundPatterns) {
-      const match = content.match(pattern);
-      if (match) {
-        extractedRound = match[0];
-        break;
-      }
-    }
-
-    // 섹터 추출 (IT, 바이오, 핀테크, 에너지, 헬스케어 등)
-    const sectorPatterns = [
-      /(IT|아이티|정보기술)/gi,
-      /(바이오|바이오테크|생명공학)/gi,
-      /(핀테크|금융기술|금융IT)/gi,
-      /(에너지|신재생에너지|태양광|풍력)/gi,
-      /(헬스케어|의료|헬스|의료기기)/gi,
-      /(모빌리티|자율주행|전기차|EV)/gi,
-      /(AI|인공지능|머신러닝|딥러닝)/gi,
-      /(블록체인|암호화폐|비트코인)/gi,
-      /(게임|게임개발|게임플랫폼)/gi,
-      /(이커머스|온라인쇼핑|전자상거래)/gi,
-      /(교육|에듀테크|온라인교육)/gi,
-      /(부동산|프롭테크|부동산기술)/gi,
-      /(로봇|로봇공학|자동화)/gi,
-      /(소셜|소셜네트워크|SNS)/gi,
-      /(콘텐츠|미디어|엔터테인먼트)/gi
-    ];
-
-    let extractedSector = '';
-    for (const pattern of sectorPatterns) {
-      const match = content.match(pattern);
-      if (match) {
-        extractedSector = match[0];
-        break;
-      }
-    }
-
-    // 투자 금액 추출 (억원, 만원, 달러 등)
-    const amountPatterns = [
-      /(\d+(?:\.\d+)?)\s*억\s*원/gi,
-      /(\d+(?:\.\d+)?)\s*만\s*원/gi,
-      /(\d+(?:\.\d+)?)\s*달러/gi,
-      /(\d+(?:\.\d+)?)\s*USD/gi,
-      /(\d+(?:\.\d+)?)\s*억\s*달러/gi,
-      /(\d+(?:\.\d+)?)\s*조\s*원/gi
-    ];
-
-    let extractedAmount = '';
-    for (const pattern of amountPatterns) {
-      const match = content.match(pattern);
-      if (match) {
-        extractedAmount = match[0];
-        break;
-      }
-    }
-
-    // 투자사 이름 추출 (기사 제목에서)
-    let extractedInvestor = '';
-    if (article?.title) {
-      // 투자사 이름 패턴 (VC, 액셀러레이터, 기업명 등)
-      const investorPatterns = [
-        /([가-힣]+(?:벤처|캐피탈|파트너스|인베스트|투자|VC|액셀러레이터))/gi,
-        /([가-힣]+(?:그룹|기업|회사|코퍼레이션))/gi,
-        /([가-힣]+(?:펀드|펀드매니저|자산운용))/gi,
-        /([가-힣]+(?:인베스트먼트|인베스트먼츠))/gi,
-        /([가-힣]+(?:홀딩스|홀딩))/gi,
-        /([가-힣]+(?:네트워크|네트워크스))/gi,
-        /([가-힣]+(?:스튜디오|스튜디오스))/gi,
-        /([가-힣]+(?:랩|랩스|랩스))/gi,
-        /([가-힣]+(?:스페이스|스페이스스))/gi,
-        /([가-힣]+(?:크리에이티브|크리에이티브스))/gi
-      ];
-
-      for (const pattern of investorPatterns) {
-        const match = article.title.match(pattern);
-        if (match) {
-          extractedInvestor = match[0];
-          break;
-        }
-      }
-    }
-
-    return {
-      round: extractedRound,
-      sector: extractedSector,
-      amount: extractedAmount,
-      investor: extractedInvestor
-    };
-  }, [article]);
-
-  // 추출된 정보를 폼에 자동 입력하는 함수
-  const applyExtractedInfoToForm = useCallback((extracted: { round: string; sector: string; amount: string; investor: string }) => {
-    if (investmentType === 'investment') {
-      if (extracted.round) {
-        form.setFieldsValue({ round_type: extracted.round });
-      }
-      if (extracted.sector) {
-        form.setFieldsValue({ sector: extracted.sector });
-      }
-      if (extracted.amount) {
-        form.setFieldsValue({ amount: extracted.amount });
-      }
-      if (extracted.investor) {
-        form.setFieldsValue({ investor_name: extracted.investor });
-      }
-    } else if (investmentType === 'fund') {
-      if (extracted.sector) {
-        form.setFieldsValue({ fund_sector: extracted.sector });
-      }
-      if (extracted.amount) {
-        form.setFieldsValue({ fund_amount: extracted.amount });
-      }
-    }
-  }, [investmentType, form]);
-
-  // 추출된 투자 정보 상태
-  const [extractedInfo, setExtractedInfo] = useState({ round: '', sector: '', amount: '' });
-
   // 모달이 열릴 때 투자사 이름 설정
   useEffect(() => {
     if (visible) {
       setAmountDisplay(''); // 한글 표시 초기화
+      setLlmResult(null); // LLM 결과 초기화
+      setShowFundList(false); // 펀드 목록 닫기
+      setInvestorFunds([]); // 펀드 목록 초기화
+      setInvestmentType('none'); // 처리 유형을 '상관없음'으로 초기화
+      form.resetFields(); // 폼 초기화
       if (investorName) {
         form.setFieldsValue({ investor_name: investorName });
+        setArticleInvestorName(investorName);
       } else if (searchInvestorId) {
         // searchInvestorId가 있으면 투자사 정보를 조회해서 설정
         fetchInvestorName(searchInvestorId);
+      } else if (article?.search_investor_id) {
+        // article의 search_investor_id로 투자사 정보 조회
+        fetchInvestorName(article.search_investor_id);
       }
     }
-  }, [visible, investorName, searchInvestorId, form]);
+  }, [visible, investorName, searchInvestorId, article?.search_investor_id, form]);
 
   // 투자사 ID로 투자사 이름 조회
   const fetchInvestorName = async (investorId: number) => {
@@ -407,20 +548,13 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
       const response = await investorsAPI.getInvestor(investorId);
       if (response.data) {
         form.setFieldsValue({ investor_name: response.data.name });
+        setArticleInvestorName(response.data.name);
       }
     } catch (error) {
       console.error('투자사 정보 조회 실패:', error);
     }
   };
 
-  // 기사 본문이 변경될 때 투자 정보 자동 추출
-  useEffect(() => {
-    if (articleContent) {
-      const extracted = extractInvestmentInfo(articleContent);
-      setExtractedInfo(extracted);
-      applyExtractedInfoToForm(extracted);
-    }
-  }, [articleContent, form, investmentType, extractInvestmentInfo, applyExtractedInfoToForm]);
 
   const handleSave = async () => {
     setLoading(true);
@@ -440,7 +574,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
           startup_name: values.startup_name,
           investor_name: values.investor_name,
           round_type: values.round_type || null,
-          amount: values.amount || null,
+          amount: values.amount ? String(values.amount).replace(/,/g, '') : null, // 천 단위 구분자 제거
           currency: values.currency || 'KRW',
           sector: values.sector,
           investment_date: values.investment_date ? 
@@ -449,7 +583,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
           extraction_method: 'manual',
           is_verified: true,
           is_correct: true,
-          user_id: user?.id
+          user_id: null
         };
         
         await investmentsAPI.createInvestment(investmentData);
@@ -458,27 +592,44 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
         onSave(investmentData);
       } else if (investmentType === 'fund') {
         const values = await form.validateFields();
+        // LLM 결과에서 ac_name을 fund_manager로 사용 (2순위 investor_id 매칭용)
+        const fundManager = llmResult?.ac_name || null;
         const fundData = {
           article_id: article?.id,
           fund_name: values.fund_name,
-          fund_amount: values.fund_amount,
-          fund_currency: values.fund_currency,
-          fund_establishment_date: values.fund_establishment_date ? 
-            (typeof values.fund_establishment_date === 'string' ? values.fund_establishment_date : values.fund_establishment_date.format('YYYY-MM-DD')) : 
-            null,
-          fund_duration: values.fund_duration,
-          fund_end_date: values.fund_end_date ? 
-            (typeof values.fund_end_date === 'string' ? values.fund_end_date : values.fund_end_date.format('YYYY-MM-DD')) : 
-            null,
           fund_sector: values.fund_sector,
-          fund_manager: values.fund_manager,
-          user_id: user?.id
+          fund_manager: fundManager,
+          user_id: null
         };
         
         await fundsAPI.createFund(fundData);
         form.resetFields();
         message.success('펀드 정보가 저장되었습니다. 기사 처리가 완료되었습니다.');
         onSave(fundData);
+      } else if (investmentType === 'others') {
+        const values = await form.validateFields();
+        
+        if (!values.others_ac_name || !values.others_event_type || !values.others_summary) {
+          message.error('AC 이름, 활동 종류, 활동 내용 요약은 필수 입력 항목입니다.');
+          return;
+        }
+        
+        const othersData = {
+          article_id: article?.id,
+          ac_name: values.others_ac_name,
+          event_type: values.others_event_type,
+          related_company: values.others_related_company || null,
+          summary: values.others_summary,
+          date: values.others_date ? 
+            (typeof values.others_date === 'string' ? values.others_date : values.others_date.format('YYYY-MM-DD')) : 
+            null,
+          user_id: null
+        };
+        
+        await otherActivitiesAPI.createOtherActivity(othersData);
+        form.resetFields();
+        message.success('기타 활동 정보가 저장되었습니다.');
+        onSave(othersData);
       } else if (investmentType === 'none') {
         // 기사만 처리하고 별도 정보 저장하지 않음
         if (article?.id) {
@@ -498,12 +649,13 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
 
   const handleCancel = () => {
     form.resetFields();
+    setLlmResult(null);
     onCancel();
   };
 
   return (
     <Modal
-      title="투자 정보 입력"
+      title="정보 입력"
       open={visible}
       onCancel={handleCancel}
       width={1400}
@@ -519,50 +671,46 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
           loading={loading} 
           onClick={handleSave}
         >
-          {investmentType === 'none' ? '처리 완료' : '저장'}
+          {investmentType === 'none' ? '처리 완료' : 
+           investmentType === 'others' ? '저장 (기타 활동)' : '저장'}
         </Button>,
       ]}
     >
       <Row gutter={24}>
         {/* 왼쪽: 기사 본문 */}
         <Col span={12}>
-          {/* 추출된 투자 정보 표시 */}
-          {(extractedInfo.round || extractedInfo.sector || extractedInfo.amount) && (
+          {/* LLM 분석 완료 알림 */}
+          {llmResult && (
             <Card 
-              title="자동 추출된 투자 정보" 
               size="small" 
               style={{ 
                 marginBottom: '16px',
-                border: '1px solid #52c41a',
+                border: '2px solid #52c41a',
                 backgroundColor: '#f6ffed'
               }}
             >
-              <Row gutter={[8, 8]}>
-                {extractedInfo.investor && (
-                  <Col span={6}>
-                    <div style={{ fontSize: '12px', color: '#666' }}>투자사</div>
-                    <div style={{ fontWeight: 'bold', color: '#52c41a' }}>{extractedInfo.investor}</div>
-                  </Col>
-                )}
-                {extractedInfo.round && (
-                  <Col span={6}>
-                    <div style={{ fontSize: '12px', color: '#666' }}>투자 라운드</div>
-                    <div style={{ fontWeight: 'bold', color: '#52c41a' }}>{extractedInfo.round}</div>
-                  </Col>
-                )}
-                {extractedInfo.sector && (
-                  <Col span={6}>
-                    <div style={{ fontSize: '12px', color: '#666' }}>투자 섹터</div>
-                    <div style={{ fontWeight: 'bold', color: '#52c41a' }}>{extractedInfo.sector}</div>
-                  </Col>
-                )}
-                {extractedInfo.amount && (
-                  <Col span={6}>
-                    <div style={{ fontSize: '12px', color: '#666' }}>투자 금액</div>
-                    <div style={{ fontWeight: 'bold', color: '#52c41a' }}>{extractedInfo.amount}</div>
-                  </Col>
-                )}
-              </Row>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <Text strong style={{ color: '#52c41a' }}>✅ LLM 분석 완료</Text>
+                  <Text type="secondary" style={{ marginLeft: '8px', fontSize: '12px' }}>
+                    ({llmResult.type === 'FUND' ? '펀드 정보' : 
+                      llmResult.type === 'INVESTMENT' ? '투자 유치' : '기타'} - 아래 폼에 자동 입력되었습니다)
+                  </Text>
+                </div>
+                <Button 
+                  size="small" 
+                  onClick={() => {
+                    setLlmResult(null);
+                    form.resetFields();
+                    // investor_name은 유지
+                    if (investorName) {
+                      form.setFieldsValue({ investor_name: investorName });
+                    }
+                  }}
+                >
+                  초기화
+                </Button>
+              </div>
             </Card>
           )}
           
@@ -586,6 +734,16 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                     disabled={showManualInput}
                   >
                     수동 입력
+                  </Button>
+                  <Button 
+                    size="small" 
+                    type="default"
+                    loading={analyzing}
+                    onClick={handleLLMAnalyze}
+                    disabled={!article?.id || !articleContent || !articleContent.trim()}
+                    style={{ backgroundColor: '#52c41a', borderColor: '#52c41a', color: '#fff' }}
+                  >
+                    {analyzing ? '분석 중...' : '🤖 LLM으로 분석하기'}
                   </Button>
                   <Button 
                     size="small" 
@@ -668,11 +826,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                             {index + 1}.
                           </div>
                           <div style={{ flex: 1 }}>
-                            <div 
-                              dangerouslySetInnerHTML={{ 
-                                __html: highlightExtractedInfo(sentence) 
-                              }}
-                            />
+                            {sentence}
                           </div>
                         </div>
                       ))
@@ -697,7 +851,31 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
         {/* 오른쪽: 투자 정보 입력 폼 */}
         <Col span={12}>
           <Card 
-            title="처리 유형 선택" 
+            title={(() => {
+              // 디버깅: article 객체 확인
+              if (article) {
+                console.log('🔍 InvestmentInputModal - article 객체:', {
+                  id: article.id,
+                  search_query: article.search_query,
+                  search_investor_id: article.search_investor_id,
+                  articleInvestorName: articleInvestorName
+                });
+              }
+              
+              if (articleInvestorName) {
+                if (article?.search_query) {
+                  return `처리유형선택 - ${articleInvestorName} (검색쿼리 - ${article.search_query})`;
+                } else {
+                  return `처리유형선택 - ${articleInvestorName}`;
+                }
+              } else {
+                if (article?.search_query) {
+                  return `처리유형선택 (검색쿼리 - ${article.search_query})`;
+                } else {
+                  return "처리유형선택";
+                }
+              }
+            })()} 
             size="small" 
             style={{ marginBottom: '16px' }}
           >
@@ -715,8 +893,14 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                 </Radio>
                 <Radio value="fund">
                   <div>
-                    <div style={{ fontWeight: 'bold' }}>펀드 결성</div>
-                    <div style={{ fontSize: '12px', color: '#666' }}>펀드 결성 정보를 입력합니다</div>
+                    <div style={{ fontWeight: 'bold' }}>펀드 정보</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>펀드 정보를 입력합니다</div>
+                  </div>
+                </Radio>
+                <Radio value="others">
+                  <div>
+                    <div style={{ fontWeight: 'bold' }}>기타 활동</div>
+                    <div style={{ fontSize: '12px', color: '#666' }}>DemoDay, MOU, 파트너십, 투자금 회수 등 기타 활동 정보를 입력합니다</div>
                   </div>
                 </Radio>
                 <Radio value="none">
@@ -755,23 +939,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
 
         <Form.Item
           name="round_type"
-          label={
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>투자 라운드 (선택사항)</span>
-              {extractedInfo.round && (
-                <span style={{ 
-                  fontSize: '12px', 
-                  color: '#52c41a', 
-                  backgroundColor: '#f6ffed', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px',
-                  border: '1px solid #b7eb8f'
-                }}>
-                  자동 추출: {extractedInfo.round}
-                </span>
-              )}
-            </div>
-          }
+          label="투자 라운드 (선택사항)"
           rules={[{ required: false, message: '투자 라운드를 선택해주세요.' }]}
         >
           <Select placeholder="투자 라운드를 선택하세요">
@@ -790,23 +958,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
         <Space.Compact style={{ width: '100%' }}>
           <Form.Item
             name="amount"
-            label={
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                <span>투자 금액 (선택사항)</span>
-                {extractedInfo.amount && (
-                  <span style={{ 
-                    fontSize: '12px', 
-                    color: '#52c41a', 
-                    backgroundColor: '#f6ffed', 
-                    padding: '2px 6px', 
-                    borderRadius: '4px',
-                    border: '1px solid #b7eb8f'
-                  }}>
-                    자동 추출: {extractedInfo.amount}
-                  </span>
-                )}
-              </div>
-            }
+            label="투자 금액 (선택사항)"
             rules={[
               { required: false, message: '투자 금액을 입력해주세요.' },
               { pattern: /^[\d,.\s]*$/, message: '숫자만 입력 가능합니다.' }
@@ -819,7 +971,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                 onChange={(e) => {
                   // 숫자, 쉼표, 점, 공백만 허용
                   const value = e.target.value.replace(/[^\d,.\s]/g, '');
-                  form.setFieldsValue({ amount: value });
+                  form.setFieldValue('amount', value);
                   
                   // 한글 변환
                   const koreanAmount = convertNumberToKorean(value);
@@ -858,23 +1010,7 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
 
         <Form.Item
           name="sector"
-          label={
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <span>섹터</span>
-              {extractedInfo.sector && (
-                <span style={{ 
-                  fontSize: '12px', 
-                  color: '#52c41a', 
-                  backgroundColor: '#f6ffed', 
-                  padding: '2px 6px', 
-                  borderRadius: '4px',
-                  border: '1px solid #b7eb8f'
-                }}>
-                  자동 추출: {extractedInfo.sector}
-                </span>
-              )}
-            </div>
-          }
+          label="섹터"
           rules={[{ required: true, message: '섹터를 입력해주세요.' }]}
         >
           <Input placeholder="섹터를 입력하세요 (예: IT, 헬스케어, 핀테크)" />
@@ -885,6 +1021,16 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
           label="투자 날짜"
         >
           <Input type="date" />
+        </Form.Item>
+
+        <Form.Item
+          name="news_summary"
+          label="기사 요약 (선택사항)"
+        >
+          <Input.TextArea 
+            placeholder="기사 내용 요약을 입력하세요" 
+            rows={3}
+          />
         </Form.Item>
             </Form>
           )}
@@ -902,84 +1048,111 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
                 label="펀드명"
                 rules={[{ required: true, message: '펀드명을 입력해주세요.' }]}
               >
-                <Input placeholder="펀드명을 입력하세요" />
+                <Input 
+                  placeholder="펀드명을 입력하세요" 
+                />
               </Form.Item>
 
-              <Space.Compact style={{ width: '100%' }}>
-                <Form.Item
-                  name="fund_amount"
-                  label="펀드 규모"
-                  rules={[
-                    { required: true, message: '펀드 규모를 입력해주세요.' },
-                    { pattern: /^[\d,.\s]*$/, message: '숫자만 입력 가능합니다.' }
-                  ]}
-                  style={{ width: '70%' }}
-                >
-                  <div>
-                    <Input 
-                      placeholder="펀드 규모를 입력하세요 (예: 100000000000)" 
-                      onChange={(e) => {
-                        // 숫자, 쉼표, 점, 공백만 허용
-                        const value = e.target.value.replace(/[^\d,.\s]/g, '');
-                        form.setFieldsValue({ fund_amount: value });
-                        
-                        // 한글 변환
-                        const koreanAmount = convertNumberToKorean(value);
-                        setAmountDisplay(koreanAmount);
-                      }}
-                    />
-                    {amountDisplay && (
-                      <div style={{ 
-                        marginTop: '4px', 
-                        fontSize: '12px', 
-                        color: '#1890ff',
-                        fontWeight: 'bold',
-                        backgroundColor: '#f0f8ff',
-                        padding: '4px 8px',
-                        borderRadius: '4px',
-                        border: '1px solid #d6e4ff'
-                      }}>
-                        {amountDisplay}원
+              {/* 펀드보기 버튼 - 입력칸 아래로 이동 */}
+              <Button 
+                icon={<EyeOutlined />}
+                onClick={async () => {
+                  // 토글 기능: 이미 열려있으면 닫기
+                  if (showFundList) {
+                    setShowFundList(false);
+                    setInvestorFunds([]);
+                    return;
+                  }
+                  
+                  const investorId = article?.search_investor_id || searchInvestorId;
+                  if (!investorId) {
+                    message.warning('기사에 연결된 투자사 정보가 없습니다.');
+                    return;
+                  }
+                  setLoadingFunds(true);
+                  setShowFundList(true);
+                  try {
+                    const response = await fundsAPI.getFunds({
+                      investor_id: investorId,
+                      limit: 1000
+                    });
+                    if (response.data && response.data.funds) {
+                      setInvestorFunds(Array.isArray(response.data.funds) ? response.data.funds : []);
+                    } else {
+                      setInvestorFunds([]);
+                    }
+                  } catch (error: any) {
+                    console.error('펀드 목록 조회 실패:', error);
+                    message.error('펀드 목록을 불러오는데 실패했습니다.');
+                    setInvestorFunds([]);
+                  } finally {
+                    setLoadingFunds(false);
+                  }
+                }}
+                style={{ marginBottom: '16px' }}
+              >
+                {articleInvestorName ? `${articleInvestorName} 펀드보기` : '펀드보기'}
+              </Button>
+
+              {/* 펀드 목록 표시 영역 */}
+              {showFundList && (
+                <div style={{ 
+                  marginTop: '16px', 
+                  padding: '16px', 
+                  border: '1px solid #d9d9d9', 
+                  borderRadius: '4px',
+                  backgroundColor: '#fafafa',
+                  maxHeight: '300px',
+                  overflowY: 'auto'
+                }}>
+                  <div style={{ 
+                    display: 'flex', 
+                    justifyContent: 'space-between', 
+                    alignItems: 'center',
+                    marginBottom: '12px'
+                  }}>
+                    <Typography.Text strong>투자사 펀드 목록</Typography.Text>
+                  </div>
+                  <Spin spinning={loadingFunds}>
+                    {investorFunds.length > 0 ? (
+                      <List
+                        size="small"
+                        dataSource={investorFunds}
+                        renderItem={(fund: any) => (
+                          <List.Item
+                            style={{
+                              padding: '8px 12px',
+                              border: '1px solid #e8e8e8',
+                              borderRadius: '4px',
+                              marginBottom: '8px',
+                              backgroundColor: '#fff'
+                            }}
+                          >
+                            <div style={{ width: '100%' }}>
+                              <Typography.Text strong style={{ fontSize: '14px' }}>
+                                {fund.fund_name}
+                                {fund.article_count > 0 && <span style={{ marginLeft: '4px' }}>🗞️</span>}
+                              </Typography.Text>
+                              <div style={{ marginTop: '4px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                                {fund.fund_sectors && (
+                                  <Tag color="blue" size="small">섹터: {fund.fund_sectors}</Tag>
+                                )}
+                                {fund.registration_date && (
+                                  <Tag size="small">등록일: {new Date(fund.registration_date).toLocaleDateString('ko-KR')}</Tag>
+                                )}
+                              </div>
+                            </div>
+                          </List.Item>
+                        )}
+                      />
+                    ) : (
+                      <div style={{ textAlign: 'center', padding: '20px 0', color: '#999' }}>
+                        {loadingFunds ? '로딩 중...' : '펀드 정보가 없습니다.'}
                       </div>
                     )}
-                  </div>
-                </Form.Item>
-                <Form.Item
-                  name="fund_currency"
-                  label="통화"
-                  style={{ width: '30%' }}
-                >
-                  <Select>
-                    <Option value="KRW">KRW</Option>
-                    <Option value="USD">USD</Option>
-                    <Option value="EUR">EUR</Option>
-                    <Option value="JPY">JPY</Option>
-                  </Select>
-                </Form.Item>
-              </Space.Compact>
-
-              <Form.Item
-                name="fund_establishment_date"
-                label="펀드 결성일"
-                rules={[{ required: true, message: '펀드 결성일을 선택해주세요.' }]}
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
-
-              <Form.Item
-                name="fund_duration"
-                label="펀드 운용기간"
-                rules={[{ required: true, message: '펀드 운용기간을 입력해주세요.' }]}
-              >
-                <Input placeholder="예: 10년, 5년" />
-              </Form.Item>
-
-              <Form.Item
-                name="fund_end_date"
-                label="투자 종료 예정일"
-              >
-                <DatePicker style={{ width: '100%' }} />
-              </Form.Item>
+                  </Spin>
+                </div>
+              )}
 
               <Form.Item
                 name="fund_sector"
@@ -988,13 +1161,61 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
               >
                 <Input placeholder="투자 섹터를 입력하세요 (예: IT, 헬스케어, 핀테크)" />
               </Form.Item>
+            </Form>
+          )}
+
+          {investmentType === 'others' && (
+            <Form
+              form={form}
+              layout="vertical"
+            >
+              <Form.Item
+                name="others_ac_name"
+                label="AC 이름"
+                rules={[{ required: true, message: 'AC 이름을 입력해주세요.' }]}
+              >
+                <Input placeholder="활동 주체인 AC 이름을 입력하세요" />
+              </Form.Item>
 
               <Form.Item
-                name="fund_manager"
-                label="펀드 운용사"
-                rules={[{ required: true, message: '펀드 운용사를 입력해주세요.' }]}
+                name="others_event_type"
+                label="활동 종류"
+                rules={[{ required: true, message: '활동 종류를 입력해주세요.' }]}
               >
-                <Input placeholder="펀드 운용사를 입력하세요" />
+                <Select placeholder="활동 종류를 선택하세요">
+                  <Option value="DemoDay">DemoDay</Option>
+                  <Option value="MOU">MOU</Option>
+                  <Option value="파트너십">파트너십</Option>
+                  <Option value="투자금 회수">투자금 회수</Option>
+                  <Option value="엑싯">엑싯</Option>
+                  <Option value="지분 매도">지분 매도</Option>
+                  <Option value="기타">기타</Option>
+                </Select>
+              </Form.Item>
+
+              <Form.Item
+                name="others_related_company"
+                label="협력 기업 (선택사항)"
+              >
+                <Input placeholder="파트너십 또는 협력 기업 이름을 입력하세요" />
+              </Form.Item>
+
+              <Form.Item
+                name="others_summary"
+                label="활동 내용 요약"
+                rules={[{ required: true, message: '활동 내용 요약을 입력해주세요.' }]}
+              >
+                <Input.TextArea 
+                  placeholder="활동 내용을 요약하여 입력하세요" 
+                  rows={4}
+                />
+              </Form.Item>
+
+              <Form.Item
+                name="others_date"
+                label="활동 날짜 (선택사항)"
+              >
+                <DatePicker style={{ width: '100%' }} />
               </Form.Item>
             </Form>
           )}
@@ -1019,8 +1240,10 @@ const InvestmentInputModal: React.FC<InvestmentInputModalProps> = ({
           )}
         </Col>
       </Row>
+
     </Modal>
   );
 };
 
 export default InvestmentInputModal;
+

@@ -1,27 +1,29 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Card, Input, Select, Tag, Space, Button, message, Modal, Form, DatePicker, Row, Col } from 'antd';
+import { Table, Card, Input, Select, Tag, Space, Button, message, Modal, Form, DatePicker, Row, Col, List, Badge } from 'antd';
 import { SearchOutlined, ReloadOutlined, CheckOutlined, CloseOutlined, DeleteOutlined } from '@ant-design/icons';
-import { useHistory } from 'react-router-dom';
-import { investmentsAPI } from '../services/api';
+import { investmentsAPI, investorsAPI } from '../services/api';
 import { Investment } from '../types';
 import dayjs from 'dayjs';
 
 const { Search, TextArea } = Input;
 const { Option } = Select;
 
+interface InvestorWithCount {
+  investor_id: number;
+  investor_name: string;
+  investment_count: number;
+}
+
 const Investments: React.FC = () => {
-  const history = useHistory();
+  const [investors, setInvestors] = useState<InvestorWithCount[]>([]);
+  const [selectedInvestorId, setSelectedInvestorId] = useState<number | null>(null);
   const [investments, setInvestments] = useState<Investment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [investmentsLoading, setInvestmentsLoading] = useState(false);
   const [total, setTotal] = useState(0);
   const [pagination, setPagination] = useState({
     current: 1,
     pageSize: 20,
-  });
-  const [filters, setFilters] = useState({
-    startup_name: '',
-    investor_name: '',
-    round_type: '',
   });
   const [selectedInvestment, setSelectedInvestment] = useState<Investment | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -29,39 +31,72 @@ const Investments: React.FC = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [form] = Form.useForm();
   const [editForm] = Form.useForm();
+  const [investorSearchText, setInvestorSearchText] = useState('');
 
-  const fetchInvestments = useCallback(async () => {
+  // 활성화된 엑셀러레이터 목록 및 투자 개수 가져오기
+  const fetchInvestors = useCallback(async () => {
     try {
       setLoading(true);
-      const params = {
-        skip: (pagination.current - 1) * pagination.pageSize,
-        limit: pagination.pageSize,
-        ...filters,
-      };
-      
-      const response = await investmentsAPI.getInvestments(params);
-      setInvestments(response.data.investments);
-      setTotal(response.data.total);
-    } catch (error) {
-      message.error('투자 정보를 불러오는데 실패했습니다.');
+      const response = await investorsAPI.getInvestorInvestmentCounts({ is_active: true });
+      if (response.data && response.data.investors) {
+        setInvestors(response.data.investors);
+        // 첫 번째 투자사를 자동 선택 (아직 선택된 투자사가 없는 경우만)
+        if (response.data.investors.length > 0 && selectedInvestorId === null) {
+          setSelectedInvestorId(response.data.investors[0].investor_id);
+        }
+      }
+    } catch (error: any) {
+      console.error('투자사 목록 로딩 오류:', error);
+      const errorMessage = error?.response?.data?.detail || error?.message || '알 수 없는 오류';
+      message.error(`투자사 목록을 불러오는데 실패했습니다: ${errorMessage}`);
     } finally {
       setLoading(false);
     }
-  }, [pagination, filters]);
+  }, []);
+
+  // 선택한 투자사의 투자 정보 목록 가져오기
+  const fetchInvestments = useCallback(async () => {
+    if (!selectedInvestorId) {
+      setInvestments([]);
+      setTotal(0);
+      return;
+    }
+
+    try {
+      setInvestmentsLoading(true);
+      const params: any = {
+        skip: (pagination.current - 1) * pagination.pageSize,
+        limit: pagination.pageSize,
+        investor_id: selectedInvestorId,
+      };
+
+      const response = await investmentsAPI.getInvestments(params);
+      setInvestments(response.data.investments || []);
+      setTotal(response.data.total || 0);
+    } catch (error) {
+      console.error('투자 정보 로딩 오류:', error);
+      message.error('투자 정보를 불러오는데 실패했습니다.');
+    } finally {
+      setInvestmentsLoading(false);
+    }
+  }, [selectedInvestorId, pagination.current, pagination.pageSize]);
+
+  useEffect(() => {
+    fetchInvestors();
+  }, [fetchInvestors]);
 
   useEffect(() => {
     fetchInvestments();
   }, [fetchInvestments]);
 
-  const handleTableChange = (pagination: any) => {
-    setPagination(pagination);
-  };
-
-  const handleSearch = (field: string, value: string) => {
-    setFilters({ ...filters, [field]: value });
+  const handleInvestorClick = (investorId: number) => {
+    setSelectedInvestorId(investorId);
     setPagination({ ...pagination, current: 1 });
   };
 
+  const handleTableChange = (pagination: any) => {
+    setPagination(pagination);
+  };
 
   const showInvestmentDetail = (investment: Investment) => {
     setSelectedInvestment(investment);
@@ -125,6 +160,7 @@ const Investments: React.FC = () => {
           await investmentsAPI.deleteInvestment(investment.id);
           message.success('투자 정보가 삭제되었습니다.');
           fetchInvestments();
+          fetchInvestors(); // 투자사 목록도 새로고침
         } catch (error) {
           message.error('투자 정보 삭제에 실패했습니다.');
         }
@@ -140,7 +176,6 @@ const Investments: React.FC = () => {
     });
     setVerifyModalVisible(true);
   };
-
 
   const handleVerify = async (values: any) => {
     if (!selectedInvestment) return;
@@ -158,7 +193,6 @@ const Investments: React.FC = () => {
       message.error('투자 정보 검수에 실패했습니다.');
     }
   };
-
 
   const formatAmount = (amount: number, currency: string) => {
     if (!amount) return '-';
@@ -204,9 +238,23 @@ const Investments: React.FC = () => {
       render: (record: Investment) => formatAmount(record.amount || 0, record.currency),
     },
     {
+      title: '섹터',
+      dataIndex: 'sector',
+      key: 'sector',
+      width: 150,
+      render: (text: string) => text ? <Tag color="purple">{text}</Tag> : '-',
+    },
+    {
+      title: '투자일',
+      dataIndex: 'investment_date',
+      key: 'investment_date',
+      width: 120,
+      render: (date: string) => date ? new Date(date).toLocaleDateString('ko-KR') : '-',
+    },
+    {
       title: '작업',
       key: 'actions',
-      width: 150,
+      width: 200,
       render: (text: any, record: Investment) => (
         <Space>
           <Button
@@ -239,65 +287,134 @@ const Investments: React.FC = () => {
     },
   ];
 
+  const selectedInvestor = investors.find(inv => inv.investor_id === selectedInvestorId);
+
+  // 엑셀러레이터 목록 필터링
+  const filteredInvestors = investors.filter(investor =>
+    investor.investor_name.toLowerCase().includes(investorSearchText.toLowerCase())
+  );
+
   return (
     <div>
-      <Card style={{ marginBottom: 16 }}>
-        <Space wrap>
-          <Search
-            placeholder="스타트업명 검색"
-            allowClear
-            style={{ width: 200 }}
-            onSearch={(value) => handleSearch('startup_name', value)}
-            prefix={<SearchOutlined />}
-          />
-          <Search
-            placeholder="투자사명 검색"
-            allowClear
-            style={{ width: 200 }}
-            onSearch={(value) => handleSearch('investor_name', value)}
-            prefix={<SearchOutlined />}
-          />
-          <Select
-            placeholder="라운드 타입"
-            allowClear
-            style={{ width: 150 }}
-            onChange={(value) => handleSearch('round_type', value || '')}
+      <Row gutter={16} style={{ height: 'calc(100vh - 100px)' }}>
+        {/* 왼쪽: 엑셀러레이터 목록 */}
+        <Col span={6} style={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+          <Card 
+            title="엑셀러레이터 목록" 
+            extra={
+              <Button 
+                icon={<ReloadOutlined />} 
+                size="small"
+                onClick={fetchInvestors}
+                loading={loading}
+              />
+            }
+            style={{ height: '100%', display: 'flex', flexDirection: 'column', overflow: 'hidden' }}
+            bodyStyle={{ 
+              flex: 1, 
+              display: 'flex', 
+              flexDirection: 'column', 
+              padding: '16px', 
+              overflow: 'hidden',
+              minHeight: 0
+            }}
           >
-            <Option value="시드">시드</Option>
-            <Option value="pre-seed">Pre-seed</Option>
-            <Option value="시리즈 A">시리즈 A</Option>
-            <Option value="시리즈 B">시리즈 B</Option>
-            <Option value="시리즈 C">시리즈 C</Option>
-          </Select>
-          <Button 
-            icon={<ReloadOutlined />} 
-            onClick={fetchInvestments}
-            loading={loading}
-          >
-            새로고침
-          </Button>
-        </Space>
-      </Card>
+            <div style={{ marginBottom: '12px', flexShrink: 0 }}>
+              <Input
+                placeholder="엑셀러레이터 검색"
+                prefix={<SearchOutlined />}
+                value={investorSearchText}
+                onChange={(e) => setInvestorSearchText(e.target.value)}
+                allowClear
+                size="small"
+              />
+            </div>
+            <div style={{ 
+              flex: 1, 
+              overflowY: 'auto', 
+              overflowX: 'hidden',
+              minHeight: 0,
+              maxHeight: '100%'
+            }}>
+              <List
+                loading={loading}
+                dataSource={filteredInvestors}
+                style={{ height: '100%' }}
+                renderItem={(investor) => (
+                  <List.Item
+                    style={{
+                      cursor: 'pointer',
+                      backgroundColor: selectedInvestorId === investor.investor_id ? '#e6f7ff' : 'transparent',
+                      padding: '12px',
+                      borderRadius: '4px',
+                      marginBottom: '8px',
+                      border: selectedInvestorId === investor.investor_id ? '1px solid #1890ff' : '1px solid #f0f0f0'
+                    }}
+                    onClick={() => handleInvestorClick(investor.investor_id)}
+                  >
+                    <List.Item.Meta
+                      title={
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <span style={{ fontWeight: selectedInvestorId === investor.investor_id ? 'bold' : 'normal' }}>
+                            {investor.investor_name}
+                          </span>
+                          <Badge 
+                            count={investor.investment_count} 
+                            style={{ backgroundColor: investor.investment_count > 0 ? '#1890ff' : '#d9d9d9' }}
+                          />
+                        </div>
+                      }
+                    />
+                  </List.Item>
+                )}
+              />
+            </div>
+          </Card>
+        </Col>
 
-      <Card>
-        <Table
-          columns={columns}
-          dataSource={investments}
-          rowKey="id"
-          loading={loading}
-          pagination={{
-            current: pagination.current,
-            pageSize: pagination.pageSize,
-            total: total,
-            showSizeChanger: true,
-            showQuickJumper: true,
-            showTotal: (total, range) => 
-              `${range[0]}-${range[1]} / 총 ${total}개`,
-          }}
-          onChange={handleTableChange}
-          scroll={{ x: 800 }}
-        />
-      </Card>
+        {/* 오른쪽: 투자 정보 목록 */}
+        <Col span={18}>
+          <Card 
+            title={selectedInvestor ? `${selectedInvestor.investor_name}의 투자 정보` : '투자 정보 목록'}
+            extra={
+              <Button 
+                icon={<ReloadOutlined />} 
+                onClick={fetchInvestments}
+                loading={investmentsLoading}
+              >
+                새로고침
+              </Button>
+            }
+            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
+            bodyStyle={{ flex: 1, overflow: 'auto' }}
+          >
+            {selectedInvestorId ? (
+              <Table
+                columns={columns}
+                dataSource={investments}
+                rowKey="id"
+                loading={investmentsLoading}
+                pagination={{
+                  current: pagination.current,
+                  pageSize: pagination.pageSize,
+                  total: total,
+                  showSizeChanger: true,
+                  showQuickJumper: true,
+                  showTotal: (total, range) => 
+                    `${range[0]}-${range[1]} / 총 ${total}개`,
+                  pageSizeOptions: ['10', '20', '50', '100'],
+                }}
+                onChange={handleTableChange}
+                scroll={{ x: 1000, y: 'calc(100vh - 300px)' }}
+              />
+            ) : (
+              <div style={{ textAlign: 'center', padding: '50px 0', color: '#999' }}>
+                왼쪽에서 엑셀러레이터를 선택하세요
+              </div>
+            )}
+          </Card>
+        </Col>
+      </Row>
 
       <Modal
         title="투자 정보 상세"

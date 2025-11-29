@@ -20,6 +20,7 @@ const Investors: React.FC = () => {
     search: '',
     sector: '',
     is_active: undefined as boolean | undefined,
+    has_website: undefined as boolean | undefined,
   });
   const [sorting, setSorting] = useState({
     sort_by: 'name',
@@ -68,6 +69,11 @@ const Investors: React.FC = () => {
 
   const handleStatusChange = (value: boolean | undefined) => {
     setFilters({ ...filters, is_active: value });
+    setPagination({ ...pagination, current: 1 });
+  };
+
+  const handleWebsiteFilterChange = (value: boolean | undefined) => {
+    setFilters({ ...filters, has_website: value });
     setPagination({ ...pagination, current: 1 });
   };
 
@@ -153,28 +159,18 @@ const Investors: React.FC = () => {
       ),
     },
     {
-      title: (
-        <span 
-          style={{ cursor: 'pointer' }}
-          onClick={() => handleSortChange('article_count')}
-        >
-          기사 개수
-          {sorting.sort_by === 'article_count' && (
-            <span style={{ marginLeft: 4 }}>
-              {sorting.sort_order === 'asc' ? '↑' : '↓'}
-            </span>
-          )}
-        </span>
-      ),
-      dataIndex: 'article_count',
-      key: 'article_count',
+      title: '웹사이트',
+      dataIndex: 'website',
+      key: 'website',
       width: 120,
-      render: (articleCount: number, record: any) => (
-        <div style={{ textAlign: 'center' }}>
-          <Tag color="blue" style={{ fontSize: '12px' }}>
-            {articleCount || 0}개
-          </Tag>
-        </div>
+      render: (website: string | null) => (
+        website ? (
+          <a href={website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()}>
+            <Tag color="blue">있음</Tag>
+          </a>
+        ) : (
+          <Tag color="default">없음</Tag>
+        )
       ),
     },
     {
@@ -243,6 +239,15 @@ const Investors: React.FC = () => {
           >
             <Option value={true}>활성</Option>
             <Option value={false}>비활성</Option>
+          </Select>
+          <Select
+            placeholder="웹사이트"
+            allowClear
+            style={{ width: 120 }}
+            onChange={handleWebsiteFilterChange}
+          >
+            <Option value={true}>있음</Option>
+            <Option value={false}>없음</Option>
           </Select>
           <Button 
             icon={<ReloadOutlined />} 

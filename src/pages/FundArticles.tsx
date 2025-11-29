@@ -1,26 +1,32 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Table, Card, Input, Tag, Space, Button, message, Spin, Row, Col, List, Badge, Checkbox } from 'antd';
-import { SearchOutlined, ReloadOutlined, EyeOutlined, StopOutlined, WarningOutlined } from '@ant-design/icons';
+import { Table, Card, Input, Button, Row, Col, List, Badge } from 'antd';
+import { SearchOutlined, ReloadOutlined, EyeOutlined } from '@ant-design/icons';
 import { articlesAPI, investorsAPI } from '../services/api';
-import { Article, Investor } from '../types';
+import { Article } from '../types';
 import ArticleDetailModal from '../components/ArticleDetailModal';
-import { useHistory } from 'react-router-dom';
 import './Articles.css';
 
-const { Search } = Input;
+interface FundArticle extends Article {
+  fund?: {
+    id: number;
+    fund_name: string;
+    investor_id: number;
+    registration_date?: string;
+    deletion_due_date?: string;
+  };
+  matched_fund_names?: string[];
+}
 
 interface InvestorWithCount {
   investor_id: number;
   investor_name: string;
-  unprocessed_count: number;
-  total_count: number;
+  fund_article_count: number;
 }
 
-const Articles: React.FC = () => {
-  const history = useHistory();
+const FundArticles: React.FC = () => {
   const [investors, setInvestors] = useState<InvestorWithCount[]>([]);
   const [selectedInvestorId, setSelectedInvestorId] = useState<number | null>(null);
-  const [articles, setArticles] = useState<Article[]>([]);
+  const [articles, setArticles] = useState<FundArticle[]>([]);
   const [loading, setLoading] = useState(true);
   const [articlesLoading, setArticlesLoading] = useState(false);
   const [total, setTotal] = useState(0);
@@ -30,15 +36,13 @@ const Articles: React.FC = () => {
   });
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
-  const [searchText, setSearchText] = useState('');
   const [investorSearchText, setInvestorSearchText] = useState('');
-  const [includeIrrelevant, setIncludeIrrelevant] = useState(false);
 
-  // 활성화된 엑셀러레이터 목록 및 미처리 기사 개수 가져오기
+  // 펀드 기사가 있는 엑셀러레이터 목록 가져오기
   const fetchInvestors = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await investorsAPI.getInvestorUnprocessedArticleCounts({ is_active: true });
+      const response = await investorsAPI.getInvestorFundArticleCounts({ is_active: true });
       if (response.data && response.data.investors) {
         setInvestors(response.data.investors);
         // 첫 번째 투자사를 자동 선택 (아직 선택된 투자사가 없는 경우만)
@@ -54,7 +58,7 @@ const Articles: React.FC = () => {
     }
   }, []);
 
-  // 선택한 투자사의 기사 목록 가져오기
+  // 선택한 투자사의 펀드 기사 목록 가져오기
   const fetchArticles = useCallback(async () => {
     if (!selectedInvestorId) {
       setArticles([]);
@@ -68,37 +72,20 @@ const Articles: React.FC = () => {
         skip: (pagination.current - 1) * pagination.pageSize,
         limit: pagination.pageSize,
         search_investor_id: selectedInvestorId,
-        exclude_irrelevant: !includeIrrelevant,  // 체크박스가 체크되면 false (포함), 체크 안되면 true (제외)
       };
 
-      if (searchText) {
-        params.search = searchText;
-      }
-
-      console.log('📡 API 호출 파라미터:', params);  // 디버깅용
-      const response = await articlesAPI.getArticles(params);
-      console.log('📥 API 응답:', { total: response.data?.total, articles_count: response.data?.articles?.length });  // 디버깅용
+      const response = await articlesAPI.getFundArticles(params);
       if (response.data) {
-        const articles = response.data.articles || [];
-        // 디버깅: 첫 번째 기사의 search_query 확인
-        if (articles.length > 0) {
-          console.log('🔍 첫 번째 기사 search_query:', {
-            id: articles[0].id,
-            title: articles[0].title?.substring(0, 50),
-            search_query: articles[0].search_query,
-            search_investor_id: articles[0].search_investor_id
-          });
-        }
-        setArticles(articles);
+        setArticles(response.data.articles || []);
         setTotal(response.data.total || 0);
       }
     } catch (error) {
-      console.error('기사 목록 로딩 오류:', error);
-      message.error('기사 목록을 불러오는데 실패했습니다.');
+      console.error('펀드 기사 목록 로딩 오류:', error);
+      message.error('펀드 기사 목록을 불러오는데 실패했습니다.');
     } finally {
       setArticlesLoading(false);
     }
-  }, [selectedInvestorId, pagination.current, pagination.pageSize, searchText, includeIrrelevant]);
+  }, [selectedInvestorId, pagination.current, pagination.pageSize]);
 
   useEffect(() => {
     fetchInvestors();
@@ -113,19 +100,34 @@ const Articles: React.FC = () => {
     setPagination({ ...pagination, current: 1 });
   };
 
-  const handleTableChange = (pagination: any) => {
-    setPagination(pagination);
+  const handleTableChange = (newPagination: any) => {
+    setPagination({
+      current: newPagination.current,
+      pageSize: newPagination.pageSize,
+    });
   };
 
-  const handleSearch = (value: string) => {
-    setSearchText(value);
-    setPagination({ ...pagination, current: 1 });
-  };
 
-  const showArticleDetail = (article: Article) => {
+  const handleArticleClick = (article: FundArticle) => {
     setSelectedArticle(article);
     setModalVisible(true);
   };
+
+  const handleModalClose = () => {
+    setModalVisible(false);
+    setSelectedArticle(null);
+  };
+
+  const handleArticleUpdate = () => {
+    fetchArticles();
+  };
+
+  const selectedInvestor = investors.find(inv => inv.investor_id === selectedInvestorId);
+
+  // 엑셀러레이터 목록 필터링
+  const filteredInvestors = investors.filter(investor =>
+    investor.investor_name.toLowerCase().includes(investorSearchText.toLowerCase())
+  );
 
   const columns = [
     {
@@ -138,48 +140,33 @@ const Articles: React.FC = () => {
       title: '제목',
       dataIndex: 'title',
       key: 'title',
-      render: (text: string, record: Article) => (
-        <div>
-          <div style={{ 
-            fontWeight: 'bold',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap',
-            maxWidth: 500
-          }}>
-            {text}
-          </div>
-          <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>
-            {record.source} | {record.published_at ? new Date(record.published_at).toLocaleDateString('ko-KR') : '-'}
-          </div>
-        </div>
+      ellipsis: true,
+      render: (text: string, record: FundArticle) => (
+        <a
+          href={record.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => {
+            e.preventDefault();
+            handleArticleClick(record);
+          }}
+        >
+          {text}
+        </a>
       ),
     },
     {
-      title: '기사 타입',
-      key: 'type',
+      title: '발행일',
+      dataIndex: 'published_at',
+      key: 'published_at',
       width: 120,
-      render: (text: any, record: Article) => {
-        const getTypeLabel = (type: string | null) => {
-          if (!type) return '미처리';
-          const typeMap: { [key: string]: { label: string; color: string } } = {
-            'investment': { label: '투자정보', color: 'blue' },
-            'fund_candidate': { label: '펀드 추정', color: 'orange' },
-            'fund': { label: '펀드정보', color: 'green' },
-            'otheractivity': { label: '기타활동', color: 'purple' },
-            'multiple': { label: '복수정보', color: 'cyan' },
-            'trash': { label: '상관없음', color: 'red' }
-          };
-          return typeMap[type] || { label: type, color: 'default' };
-        };
-
-        const typeInfo = getTypeLabel(record.type);
-        
-        return (
-          <Tag color={typeInfo.color}>
-            {typeInfo.label}
-          </Tag>
-        );
+      render: (date: string) => {
+        if (!date) return '-';
+        try {
+          return new Date(date).toLocaleDateString('ko-KR');
+        } catch {
+          return date;
+        }
       },
     },
     {
@@ -187,30 +174,30 @@ const Articles: React.FC = () => {
       dataIndex: 'scraped_at',
       key: 'scraped_at',
       width: 120,
-      render: (date: string) => date ? new Date(date).toLocaleDateString('ko-KR') : '-',
+      render: (date: string) => {
+        if (!date) return '-';
+        try {
+          return new Date(date).toLocaleDateString('ko-KR');
+        } catch {
+          return date;
+        }
+      },
     },
     {
       title: '작업',
-      key: 'actions',
+      key: 'action',
       width: 100,
-      render: (text: any, record: Article) => (
+      render: (_: any, record: FundArticle) => (
         <Button
           type="link"
           icon={<EyeOutlined />}
-          onClick={() => showArticleDetail(record)}
+          onClick={() => handleArticleClick(record)}
         >
           보기
         </Button>
       ),
     },
   ];
-
-  const selectedInvestor = investors.find(inv => inv.investor_id === selectedInvestorId);
-
-  // 엑셀러레이터 목록 필터링
-  const filteredInvestors = investors.filter(investor =>
-    investor.investor_name.toLowerCase().includes(investorSearchText.toLowerCase())
-  );
 
   return (
     <div>
@@ -277,14 +264,9 @@ const Articles: React.FC = () => {
                             {investor.investor_name}
                           </span>
                           <Badge 
-                            count={investor.unprocessed_count} 
-                            style={{ backgroundColor: investor.unprocessed_count > 0 ? '#ff4d4f' : '#52c41a' }}
+                            count={investor.fund_article_count} 
+                            style={{ backgroundColor: investor.fund_article_count > 0 ? '#1890ff' : '#d9d9d9' }}
                           />
-                        </div>
-                      }
-                      description={
-                        <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
-                          전체: {investor.total_count}개
                         </div>
                       }
                     />
@@ -295,51 +277,21 @@ const Articles: React.FC = () => {
           </Card>
         </Col>
 
-        {/* 오른쪽: 기사 목록 */}
+        {/* 오른쪽: 펀드 기사 목록 */}
         <Col span={18}>
-          <Card 
-            title={selectedInvestor ? `${selectedInvestor.investor_name}의 기사` : '기사 목록'}
+          <Card
+            title={selectedInvestor ? `${selectedInvestor.investor_name}의 펀드 기사` : '펀드 기사'}
             extra={
-              <Space>
-                <Checkbox
-                  checked={includeIrrelevant}
-                  onChange={(e) => {
-                    setIncludeIrrelevant(e.target.checked);
-                    setPagination({ ...pagination, current: 1 });
-                  }}
-                >
-                  상관없음 포함
-                </Checkbox>
-                <Search
-                  placeholder="제목 또는 내용 검색"
-                  allowClear
-                  style={{ width: 250 }}
-                  onSearch={handleSearch}
-                  prefix={<SearchOutlined />}
-                />
-                <Button 
-                  icon={<StopOutlined />}
-                  onClick={() => history.push('/blacklist')}
-                >
-                  블랙리스트
-                </Button>
-                <Button 
-                  icon={<WarningOutlined />}
-                  onClick={() => history.push('/crawling-failed-domains')}
-                >
-                  크롤링 실패 예상 주소
-                </Button>
-                <Button 
-                  icon={<ReloadOutlined />} 
-                  onClick={fetchArticles}
-                  loading={articlesLoading}
-                >
-                  새로고침
-                </Button>
-              </Space>
+              <Button
+                icon={<ReloadOutlined />}
+                onClick={fetchArticles}
+                loading={articlesLoading}
+              >
+                새로고침
+              </Button>
             }
-            style={{ height: '100%', display: 'flex', flexDirection: 'column' }}
-            bodyStyle={{ flex: 1, overflow: 'auto' }}
+            style={{ height: 'calc(100vh - 100px)', display: 'flex', flexDirection: 'column' }}
+            bodyStyle={{ flex: 1, overflow: 'hidden', padding: '24px' }}
           >
             {selectedInvestorId ? (
               <Table
@@ -347,9 +299,6 @@ const Articles: React.FC = () => {
                 dataSource={articles}
                 rowKey="id"
                 loading={articlesLoading}
-                rowClassName={(record: Article) => {
-                  return record.is_processed ? 'processed-row' : '';
-                }}
                 pagination={{
                   current: pagination.current,
                   pageSize: pagination.pageSize,
@@ -361,25 +310,27 @@ const Articles: React.FC = () => {
                   pageSizeOptions: ['10', '20', '50', '100'],
                 }}
                 onChange={handleTableChange}
-                scroll={{ x: 1000, y: 'calc(100vh - 300px)' }}
+                scroll={{ x: 1200, y: 'calc(100vh - 300px)' }}
               />
             ) : (
               <div style={{ textAlign: 'center', padding: '50px 0', color: '#999' }}>
-                왼쪽에서 엑셀러레이터를 선택하세요
+                엑셀러레이터를 선택해주세요.
               </div>
             )}
           </Card>
         </Col>
       </Row>
 
-      <ArticleDetailModal
-        visible={modalVisible}
-        article={selectedArticle}
-        onClose={() => setModalVisible(false)}
-        onArticleUpdate={fetchArticles}
-      />
+      {selectedArticle && (
+        <ArticleDetailModal
+          article={selectedArticle}
+          visible={modalVisible}
+          onClose={handleModalClose}
+          onArticleUpdate={handleArticleUpdate}
+        />
+      )}
     </div>
   );
 };
 
-export default Articles;
+export default FundArticles;
