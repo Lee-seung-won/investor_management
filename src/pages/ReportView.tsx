@@ -11,11 +11,9 @@ import {
   Space,
   Typography,
   Divider,
-  Result,
 } from 'antd';
-import { ArrowLeftOutlined, FileTextOutlined, HomeOutlined } from '@ant-design/icons';
+import { ArrowLeftOutlined, FileTextOutlined } from '@ant-design/icons';
 import { reportsAPI } from '../services/api';
-import { usePermissions } from '../utils/permissions';
 
 const { Title } = Typography;
 
@@ -71,7 +69,6 @@ interface Report {
 const ReportView: React.FC = () => {
   const { investorId } = useParams<{ investorId: string }>();
   const history = useHistory();
-  const { hasPermission } = usePermissions();
   const [reportData, setReportData] = useState<Report | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -105,21 +102,6 @@ const ReportView: React.FC = () => {
     return num;
   };
 
-  // 권한 체크
-  if (!hasPermission('view_report_detail')) {
-    return (
-      <Result
-        status="403"
-        title="403"
-        subTitle="보고서 상세보기 권한이 없습니다."
-        extra={
-          <Button type="primary" icon={<HomeOutlined />} onClick={() => history.push('/')}>
-            홈으로 돌아가기
-          </Button>
-        }
-      />
-    );
-  }
 
   if (loading) {
     return (

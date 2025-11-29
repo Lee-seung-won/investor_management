@@ -13,7 +13,7 @@ import {
   Result,
   Button,
 } from 'antd';
-import { SearchOutlined, FileTextOutlined, HomeOutlined, LockOutlined } from '@ant-design/icons';
+import { SearchOutlined, FileTextOutlined, HomeOutlined } from '@ant-design/icons';
 import { useHistory } from 'react-router-dom';
 import { reportsAPI } from '../services/api';
 import { usePermissions } from '../utils/permissions';
@@ -64,12 +64,6 @@ const Reports: React.FC = () => {
       return;
     }
 
-    // 권한 체크
-    if (!hasPermission('view_report_detail')) {
-      message.warning('보고서 상세보기 권한이 없습니다.');
-      return;
-    }
-
     // 현재 탭에서 보고서 열기
     history.push(`/reports/view/${investor.id}`);
   };
@@ -90,16 +84,14 @@ const Reports: React.FC = () => {
       dataIndex: 'name',
       key: 'name',
       render: (text: string, record: Investor) => {
-        const canViewDetail = hasPermission('view_report_detail');
         return (
           <a
             onClick={() => handleInvestorClick(record)}
             style={{ 
-              cursor: canViewDetail ? 'pointer' : 'not-allowed', 
-              color: canViewDetail ? '#1890ff' : '#722ed1' 
+              cursor: 'pointer', 
+              color: '#1890ff'
             }}
           >
-            {!canViewDetail && <LockOutlined style={{ marginRight: 4 }} />}
             {text}
           </a>
         );
