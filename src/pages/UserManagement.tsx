@@ -17,6 +17,7 @@ interface User {
     access_labeling: boolean;
     access_api_docs: boolean;
     access_profile_management: boolean;
+    collect_data_mart: boolean;
   };
   created_at: string | null;
   last_login: string | null;
@@ -30,6 +31,7 @@ const PERMISSION_LABELS: { [key: string]: string } = {
   access_labeling: '라벨링 페이지 접근',
   access_api_docs: 'API 문서 페이지 접근',
   access_profile_management: '프로필 관리 페이지 접근',
+  collect_data_mart: '데이터마트 수집',
 };
 
 const UserManagement: React.FC = () => {

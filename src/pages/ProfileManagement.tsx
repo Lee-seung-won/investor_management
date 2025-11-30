@@ -3,6 +3,7 @@ import { Card, Typography, Result, Button } from 'antd';
 import { UserOutlined, HomeOutlined } from '@ant-design/icons';
 import { useHistory } from 'react-router-dom';
 import ProfileChangeDetectorProgress from '../components/ProfileChangeDetectorProgress';
+import EmbeddingVectorDBBuilderProgress from '../components/EmbeddingVectorDBBuilderProgress';
 import { usePermissions } from '../utils/permissions';
 
 const { Title } = Typography;
@@ -33,8 +34,12 @@ const ProfileManagement: React.FC = () => {
         <UserOutlined /> 프로필 관리
       </Title>
       
-      <Card style={{ marginTop: '24px' }}>
+      <Card style={{ marginTop: '24px', marginBottom: '24px' }}>
         <ProfileChangeDetectorProgress />
+      </Card>
+      
+      <Card style={{ marginTop: '24px' }}>
+        <EmbeddingVectorDBBuilderProgress />
       </Card>
     </div>
   );

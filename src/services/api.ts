@@ -272,6 +272,27 @@ export const profileManagementAPI = {
   getStatus: () => api.get('/api/profile-management/status'),
   startDetection: (resume: boolean = false) => api.post('/api/profile-management/start', { resume }),
   stopDetection: () => api.post('/api/profile-management/stop', {}),
+  // 임베딩 및 벡터DB 구축 API
+  getEmbeddingBuilderStatus: () => api.get('/api/profile-management/embedding-builder/status'),
+  startEmbeddingBuilder: (resume: boolean = false) => api.post('/api/profile-management/embedding-builder/start', { resume }),
+  stopEmbeddingBuilder: () => api.post('/api/profile-management/embedding-builder/stop', {}),
+};
+
+// 데이터 마트 API
+export const dataMartAPI = {
+  // 데이터 마트 정보
+  getInfoList: () => api.get('/api/data-mart/info'),
+  getInfo: (infoId: number) => api.get(`/api/data-mart/info/${infoId}`),
+  createInfo: (data: any) => api.post('/api/data-mart/info', data),
+  updateInfo: (infoId: number, data: any) => api.put(`/api/data-mart/info/${infoId}`, data),
+  deleteInfo: (infoId: number) => api.delete(`/api/data-mart/info/${infoId}`),
+  // 데이터 마트 수집
+  getCollectionStatus: () => api.get('/api/data-mart/collection/status'),
+  startCollection: (resume: boolean = false) => api.post('/api/data-mart/collection/start', { resume }),
+  stopCollection: () => api.post('/api/data-mart/collection/stop', {}),
+  // 데이터 마트
+  getInvestorDataMart: (investorId: number) => api.get(`/api/data-mart/investor/${investorId}`),
+  search: (investorName: string) => api.get('/api/data-mart/search', { params: { investor_name: investorName } }),
 };
 
 

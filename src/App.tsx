@@ -12,7 +12,8 @@ import {
   FileSearchOutlined,
   CloudDownloadOutlined,
   UserOutlined,
-  LogoutOutlined
+  LogoutOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
@@ -31,6 +32,7 @@ import ProfileManagement from './pages/ProfileManagement';
 import NewsCollection from './pages/NewsCollection';
 import FundArticles from './pages/FundArticles';
 import ReportCollection from './pages/ReportCollection';
+import DataMart from './pages/DataMart';
 import Login from './pages/Login';
 import UserManagement from './pages/UserManagement';
 import NotFound from './pages/NotFound';
@@ -119,6 +121,10 @@ const AppContent: React.FC = () => {
       label: '프로필 관리',
       style: hasPermission('access_profile_management') ? {} : { color: '#722ed1' },
     },
+    // 구분선: 기본 정보 그룹 끝
+    {
+      type: 'divider' as const,
+    },
     {
       key: '/articles',
       icon: <FileTextOutlined />,
@@ -139,6 +145,10 @@ const AppContent: React.FC = () => {
       icon: hasPermission('access_report_collection') ? <CloudDownloadOutlined /> : <LockOutlined />,
       label: '보고서 수집',
       style: hasPermission('access_report_collection') ? {} : { color: '#722ed1' },
+    },
+    // 구분선: 수집 관련 그룹 끝
+    {
+      type: 'divider' as const,
     },
     {
       key: '/investments',
@@ -161,6 +171,10 @@ const AppContent: React.FC = () => {
       label: '보고서',
       style: hasPermission('access_reports') ? {} : { color: '#722ed1' },
     },
+    // 구분선: 데이터 관리 그룹 끝
+    {
+      type: 'divider' as const,
+    },
     {
       key: '/labeling',
       icon: hasPermission('access_labeling') ? <TagOutlined /> : <LockOutlined />,
@@ -173,15 +187,26 @@ const AppContent: React.FC = () => {
       label: 'API 문서',
       style: hasPermission('access_api_docs') ? {} : { color: '#722ed1' },
     },
+    {
+      key: '/data-mart',
+      icon: <DatabaseOutlined />,
+      label: '데이터 마트',
+    },
   ];
 
   // 어드민인 경우 접근 관리 메뉴 추가
   if (user?.role === 'admin') {
-    menuItems.push({
-      key: '/user-management',
-      icon: <UserOutlined />,
-      label: '접근 관리',
-    });
+    menuItems.push(
+      // 구분선: 도구 그룹 끝
+      {
+        type: 'divider' as const,
+      },
+      {
+        key: '/user-management',
+        icon: <UserOutlined />,
+        label: '접근 관리',
+      }
+    );
   }
 
   const handleMenuClick = ({ key }: { key: string }) => {
@@ -292,6 +317,7 @@ const AppContent: React.FC = () => {
                 return <APIDocs />;
               }} 
             />
+            <PrivateRoute path="/data-mart" component={DataMart} />
             <PrivateRoute path="/blacklist" component={Blacklist} />
             <PrivateRoute path="/crawling-failed-domains" component={CrawlingFailedDomains} />
             <Route 

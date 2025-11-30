@@ -139,13 +139,13 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
             <TabPane tab="기본정보" key="info">
               <Card>
                 <Descriptions column={2} bordered>
-                <Descriptions.Item label="투자사명" span={2} contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
-                  <Text strong style={{ display: 'block', lineHeight: '1.5' }}>{investor.name}</Text>
+                <Descriptions.Item label="투자사명" span={2}>
+                  <Text strong>{investor.name}</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="유형" contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
-                  <Text style={{ display: 'block', lineHeight: '1.5' }}>{investor.type}</Text>
+                <Descriptions.Item label="유형">
+                  <Text>{investor.type}</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="상태" contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
+                <Descriptions.Item label="상태">
                   {isEditing ? (
                     <Form.Item name="is_active" valuePropName="checked" style={{ margin: 0 }}>
                       <Switch 
@@ -159,14 +159,14 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     </Tag>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="웹사이트" span={2} contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
+                <Descriptions.Item label="웹사이트" span={2}>
                   {isEditing ? (
                     <Form.Item name="website" style={{ margin: 0 }}>
                       <Input placeholder="웹사이트 URL을 입력하세요" />
                     </Form.Item>
                   ) : (
                     investor.website ? (
-                      <a href={investor.website} target="_blank" rel="noopener noreferrer" style={{ display: 'block', lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      <a href={investor.website} target="_blank" rel="noopener noreferrer">
                         <GlobalOutlined /> {investor.website}
                       </a>
                     ) : (
@@ -174,33 +174,33 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     )
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="연락처" span={2} contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
+                <Descriptions.Item label="연락처" span={2}>
                   {isEditing ? (
                     <Form.Item name="contact" style={{ margin: 0 }}>
                       <Input placeholder="연락처를 입력하세요" />
                     </Form.Item>
                   ) : (
                     investor.contact ? (
-                      <Text copyable style={{ display: 'block', lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{investor.contact}</Text>
+                      <Text copyable>{investor.contact}</Text>
                     ) : (
                       <Text type="secondary">정보 없음</Text>
                     )
                       )}
                 </Descriptions.Item>
-                <Descriptions.Item label="이메일" span={2} contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
+                <Descriptions.Item label="이메일" span={2}>
                   {isEditing ? (
                     <Form.Item name="email" style={{ margin: 0 }}>
                       <Input placeholder="이메일을 입력하세요" type="email" />
                     </Form.Item>
                   ) : (
                     investor.email ? (
-                      <Text copyable style={{ display: 'block', lineHeight: '1.5', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{investor.email}</Text>
+                      <Text copyable>{investor.email}</Text>
                     ) : (
                       <Text type="secondary">정보 없음</Text>
                     )
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="전문분야" span={2} contentStyle={{ maxHeight: '50px', overflowY: 'auto' }}>
+                <Descriptions.Item label="전문분야" span={2}>
                   {isEditing ? (
                     <Form.Item name="sectors" style={{ margin: 0 }}>
                       <Select
@@ -212,7 +212,7 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     </Form.Item>
                   ) : (
                     investor.sectors && investor.sectors.length > 0 ? (
-                      <div style={{ maxHeight: '40px', overflowY: 'auto' }}>
+                      <div>
                         {investor.sectors.map((sector, index) => (
                           <Tag key={index} color="blue" style={{ marginBottom: 2, marginRight: 4 }}>
                             {sector}
@@ -224,7 +224,7 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     )
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="설명" span={2} contentStyle={{ maxHeight: '150px', overflowY: 'auto' }}>
+                <Descriptions.Item label="설명" span={2}>
                   {isEditing ? (
                     <Form.Item name="description" style={{ margin: 0 }}>
                       <Input.TextArea 
@@ -242,14 +242,12 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     )
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="프로필 텍스트" span={2} contentStyle={{ maxHeight: '300px', overflowY: 'auto' }}>
+                <Descriptions.Item label="프로필 텍스트" span={2}>
                   {investor.profile_text ? (
                     <div style={{ 
                       padding: '12px', 
                       backgroundColor: '#f5f5f5', 
-                      borderRadius: '4px',
-                      maxHeight: '280px',
-                      overflowY: 'auto'
+                      borderRadius: '4px'
                     }}>
                       <Paragraph style={{ margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word' }}>
                         {investor.profile_text}
@@ -262,11 +260,11 @@ const InvestorDetailModal: React.FC<InvestorDetailModalProps> = ({
                     <Text type="secondary">프로필 텍스트가 생성되지 않았습니다.</Text>
                   )}
                 </Descriptions.Item>
-                <Descriptions.Item label="등록일" contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
-                  <Text style={{ display: 'block', lineHeight: '1.5' }}>{new Date(investor.created_at).toLocaleDateString('ko-KR')}</Text>
+                <Descriptions.Item label="등록일">
+                  <Text>{new Date(investor.created_at).toLocaleDateString('ko-KR')}</Text>
                 </Descriptions.Item>
-                <Descriptions.Item label="수정일" contentStyle={{ maxHeight: '32px', overflow: 'hidden' }}>
-                  <Text style={{ display: 'block', lineHeight: '1.5' }}>{new Date(investor.updated_at).toLocaleDateString('ko-KR')}</Text>
+                <Descriptions.Item label="수정일">
+                  <Text>{new Date(investor.updated_at).toLocaleDateString('ko-KR')}</Text>
                 </Descriptions.Item>
               </Descriptions>
             </Card>
