@@ -263,7 +263,7 @@ export const blacklistAPI = {
 
 // 크롤링 실패 예상 주소 API
 export const crawlingFailedDomainsAPI = {
-  getCrawlingFailedDomains: (skip?: number, limit?: number) => api.get('/api/crawling-failed-domains', { params: { skip, limit } }),
+  getCrawlingFailedDomains: (skip?: number, limit?: number) => api.get('/api/crawling-failed-domains/', { params: { skip, limit } }),
   deleteCrawlingFailedDomain: (domainId: number) => api.delete(`/api/crawling-failed-domains/${domainId}`),
 };
 
