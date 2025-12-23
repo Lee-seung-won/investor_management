@@ -34,6 +34,7 @@ const { Panel } = Collapse;
 interface MatchingRequest {
   prompt: string;
   top_k: number;
+  min_confidence?: number;
 }
 
 interface MatchingResponse {
@@ -49,10 +50,12 @@ const APIDocs: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [matchingRequest, setMatchingRequest] = useState<MatchingRequest>({
     prompt: '',
-    top_k: 10
+    top_k: 10,
+    min_confidence: 0.0
   });
   const [matchingResponse, setMatchingResponse] = useState<MatchingResponse | null>(null);
   const [copiedText, setCopiedText] = useState<string>('');
+  const [viewMode, setViewMode] = useState<'summary' | 'json'>('summary');
 
   // 매칭 API 테스트
   const handleMatchingTest = async () => {
@@ -71,7 +74,8 @@ const APIDocs: React.FC = () => {
         },
         body: JSON.stringify({
           prompt: matchingRequest.prompt,
-          top_k: matchingRequest.top_k
+          top_k: matchingRequest.top_k,
+          ...(matchingRequest.min_confidence !== undefined && { min_confidence: matchingRequest.min_confidence })
         })
       });
 
@@ -103,7 +107,8 @@ const APIDocs: React.FC = () => {
   const generateExampleRequest = () => {
     return JSON.stringify({
       prompt: "AI 스타트업에서 투자를 받고 싶어요",
-      top_k: 5
+      top_k: 5,
+      min_confidence: 0.3
     }, null, 2);
   };
 
@@ -187,8 +192,119 @@ const APIDocs: React.FC = () => {
                         <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>❌</td>
                         <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>반환할 투자사 수 (기본값: 10, 최대: 100)</td>
                       </tr>
+                      <tr>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>min_confidence</td>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>number</td>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>❌</td>
+                        <td style={{ padding: '8px', border: '1px solid #d9d9d9' }}>최소 매칭 점수 (기본값: 0.0, 범위: 0.0 ~ 1.0)</td>
+                      </tr>
                     </tbody>
                   </table>
+                </Card>
+              </Col>
+
+              <Col span={24}>
+                <Card title="📨 API 요청 형식" size="small">
+                  <Paragraph style={{ marginBottom: '16px' }}>
+                    <Text strong>엔드포인트:</Text> <code>POST /api/matching/match</code>
+                  </Paragraph>
+                  <Paragraph style={{ marginBottom: '16px' }}>
+                    <Text strong>Content-Type:</Text> <code>application/json</code>
+                  </Paragraph>
+                  
+                  <Divider>요청 본문 (Request Body)</Divider>
+                  
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text strong>기본 요청 형식:</Text>
+                    <div style={{ position: 'relative', marginTop: '8px' }}>
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => copyToClipboard(generateExampleRequest(), '요청 JSON')}
+                        style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1 }}
+                      >
+                        {copiedText === '요청 JSON' ? <CheckCircleOutlined /> : <CopyOutlined />}
+                      </Button>
+                      <pre style={{ 
+                        backgroundColor: '#f5f5f5', 
+                        padding: '16px', 
+                        borderRadius: '4px', 
+                        margin: 0,
+                        fontSize: '13px',
+                        lineHeight: '1.5',
+                        fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, "source-code-pro", monospace',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+{`{
+  "prompt": "AI 스타트업에서 투자를 받고 싶어요",
+  "top_k": 5,
+  "min_confidence": 0.3
+}`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: '16px' }}>
+                    <Text strong>최소 요청 형식 (필수 파라미터만):</Text>
+                    <div style={{ position: 'relative', marginTop: '8px' }}>
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => copyToClipboard(JSON.stringify({
+                          prompt: "AI 스타트업에서 투자를 받고 싶어요"
+                        }, null, 2), '최소 요청 JSON')}
+                        style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1 }}
+                      >
+                        {copiedText === '최소 요청 JSON' ? <CheckCircleOutlined /> : <CopyOutlined />}
+                      </Button>
+                      <pre style={{ 
+                        backgroundColor: '#f5f5f5', 
+                        padding: '16px', 
+                        borderRadius: '4px', 
+                        margin: 0,
+                        fontSize: '13px',
+                        lineHeight: '1.5',
+                        fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, "source-code-pro", monospace',
+                        whiteSpace: 'pre-wrap',
+                        wordBreak: 'break-word'
+                      }}>
+{`{
+  "prompt": "AI 스타트업에서 투자를 받고 싶어요"
+}`}
+                      </pre>
+                    </div>
+                  </div>
+
+                  <Alert
+                    message="요청 예시"
+                    description={
+                      <div>
+                        <div style={{ marginBottom: '8px' }}>
+                          <Text strong>예시 1:</Text> 기본 요청
+                        </div>
+                        <code style={{ display: 'block', marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          {`{ "prompt": "바이오테크 스타트업에 투자받고 싶습니다", "top_k": 10 }`}
+                        </code>
+                        
+                        <div style={{ marginBottom: '8px' }}>
+                          <Text strong>예시 2:</Text> 지역명 포함
+                        </div>
+                        <code style={{ display: 'block', marginBottom: '12px', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          {`{ "prompt": "서울 지역 AI 스타트업에서 시리즈A 투자를 받고 싶어요", "top_k": 5 }`}
+                        </code>
+                        
+                        <div style={{ marginBottom: '8px' }}>
+                          <Text strong>예시 3:</Text> 최소 신뢰도 설정
+                        </div>
+                        <code style={{ display: 'block', padding: '8px', backgroundColor: '#f5f5f5', borderRadius: '4px' }}>
+                          {`{ "prompt": "핀테크 스타트업 투자", "top_k": 20, "min_confidence": 0.5 }`}
+                        </code>
+                      </div>
+                    }
+                    type="info"
+                    style={{ marginTop: '16px' }}
+                  />
                 </Card>
               </Col>
 
@@ -265,6 +381,25 @@ const APIDocs: React.FC = () => {
                       />
                     </div>
 
+                    <div>
+                      <Text strong>최소 매칭 점수 (선택)</Text>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.1}
+                        value={matchingRequest.min_confidence}
+                        onChange={(e) => setMatchingRequest({
+                          ...matchingRequest,
+                          min_confidence: parseFloat(e.target.value) || 0.0
+                        })}
+                        placeholder="0.0"
+                      />
+                      <div style={{ fontSize: '12px', color: '#666', marginTop: '4px' }}>
+                        이 점수 이상인 투자사만 반환됩니다 (0.0 ~ 1.0)
+                      </div>
+                    </div>
+
                     <Button
                       type="primary"
                       icon={<PlayCircleOutlined />}
@@ -279,7 +414,21 @@ const APIDocs: React.FC = () => {
               </Col>
 
               <Col span={12}>
-                <Card title="📊 응답 결과" size="small">
+                <Card 
+                  title="📊 응답 결과" 
+                  size="small"
+                  extra={
+                    matchingResponse && (
+                      <Button
+                        size="small"
+                        icon={<CopyOutlined />}
+                        onClick={() => copyToClipboard(JSON.stringify(matchingResponse, null, 2), '응답 JSON')}
+                      >
+                        {copiedText === '응답 JSON' ? <CheckCircleOutlined /> : 'JSON 복사'}
+                      </Button>
+                    )
+                  }
+                >
                   {loading ? (
                     <div style={{ textAlign: 'center', padding: '40px' }}>
                       <Spin size="large" />
@@ -293,24 +442,71 @@ const APIDocs: React.FC = () => {
                         style={{ marginBottom: '16px' }}
                       />
                       
-                      <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                        {matchingResponse.matched_investors.map((investor, index) => (
-                          <Card key={investor.investor_id} size="small" style={{ marginBottom: '8px' }}>
-                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                              <div>
-                                <Text strong>#{index + 1} {investor.investor_name}</Text>
-                                <div style={{ marginTop: '4px' }}>
-                                  <Tag color="blue">점수: {investor.match_score}</Tag>
-                                  <Tag color="green">{investor.type}</Tag>
-                                </div>
-                                <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
-                                  {investor.recommendation_reason}
+                      <div style={{ marginBottom: '12px' }}>
+                        <Space>
+                          <Button
+                            size="small"
+                            type={viewMode === 'summary' ? 'primary' : 'default'}
+                            onClick={() => setViewMode('summary')}
+                          >
+                            요약 보기
+                          </Button>
+                          <Button
+                            size="small"
+                            type={viewMode === 'json' ? 'primary' : 'default'}
+                            onClick={() => setViewMode('json')}
+                          >
+                            JSON 보기
+                          </Button>
+                        </Space>
+                      </div>
+                      
+                      {viewMode === 'summary' ? (
+                        <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
+                          {matchingResponse.matched_investors.map((investor, index) => (
+                            <Card key={investor.investor_id} size="small" style={{ marginBottom: '8px' }}>
+                              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <div>
+                                  <Text strong>#{index + 1} {investor.investor_name}</Text>
+                                  <div style={{ marginTop: '4px' }}>
+                                    <Tag color="blue">점수: {investor.match_score}</Tag>
+                                    <Tag color="green">{investor.type}</Tag>
+                                  </div>
+                                  <div style={{ marginTop: '4px', fontSize: '12px', color: '#666' }}>
+                                    {investor.recommendation_reason}
+                                  </div>
                                 </div>
                               </div>
-                            </div>
-                          </Card>
-                        ))}
-                      </div>
+                            </Card>
+                          ))}
+                        </div>
+                      ) : (
+                        <div style={{ position: 'relative' }}>
+                          <Button
+                            size="small"
+                            icon={<CopyOutlined />}
+                            onClick={() => copyToClipboard(JSON.stringify(matchingResponse, null, 2), '응답 JSON')}
+                            style={{ position: 'absolute', top: '8px', right: '8px', zIndex: 1 }}
+                          >
+                            {copiedText === '응답 JSON' ? <CheckCircleOutlined /> : <CopyOutlined />}
+                          </Button>
+                          <pre style={{ 
+                            backgroundColor: '#f5f5f5', 
+                            padding: '16px', 
+                            borderRadius: '4px', 
+                            margin: 0,
+                            maxHeight: '500px',
+                            overflow: 'auto',
+                            fontSize: '12px',
+                            lineHeight: '1.5',
+                            fontFamily: 'Monaco, Menlo, "Ubuntu Mono", Consolas, "source-code-pro", monospace',
+                            whiteSpace: 'pre-wrap',
+                            wordBreak: 'break-word'
+                          }}>
+                            {JSON.stringify(matchingResponse, null, 2)}
+                          </pre>
+                        </div>
+                      )}
                     </div>
                   ) : (
                     <div style={{ textAlign: 'center', padding: '40px', color: '#999' }}>
@@ -567,7 +763,8 @@ url = "${baseUrl}/api/matching/match"
 # 요청 데이터
 data = {
     "prompt": "AI 스타트업에서 투자를 받고 싶어요",
-    "top_k": 5
+    "top_k": 5,
+    "min_confidence": 0.3  # 선택사항
 }
 
 # API 호출
@@ -595,7 +792,8 @@ const apiUrl = "${baseUrl}/api/matching/match";
 
 const requestData = {
     prompt: "AI 스타트업에서 투자를 받고 싶어요",
-    top_k: 5
+    top_k: 5,
+    min_confidence: 0.3  // 선택사항
 };
 
 fetch(apiUrl, {
@@ -644,6 +842,7 @@ const generateSpringBootExample = () => {
 public class MatchingRequest {
     private String prompt;
     private Integer topK = 10;
+    private Double minConfidence = 0.0;  // 선택사항
 }
 
 @Data
@@ -683,8 +882,8 @@ public class InvestorMatchingService {
     @Autowired
     private RestTemplate restTemplate;
     
-    public MatchingResponse findMatchingInvestors(String prompt, Integer topK) {
-        MatchingRequest request = new MatchingRequest(prompt, topK);
+    public MatchingResponse findMatchingInvestors(String prompt, Integer topK, Double minConfidence) {
+        MatchingRequest request = new MatchingRequest(prompt, topK, minConfidence);
         
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -718,7 +917,8 @@ public class InvestorMatchingController {
         try {
             MatchingResponse response = matchingService.findMatchingInvestors(
                 request.getPrompt(),
-                request.getTopK()
+                request.getTopK(),
+                request.getMinConfidence()
             );
             
             return ResponseEntity.ok(response);
@@ -754,10 +954,15 @@ public class ExampleController {
     @GetMapping("/example")
     public ResponseEntity<?> example() {
         // 투자사 매칭 요청
-        MatchingResponse response = matchingService.findMatchingInvestors(
+        MatchingRequest request = new MatchingRequest(
             "AI 스타트업에서 투자를 받고 싶어요",
             5,
             0.3
+        );
+        MatchingResponse response = matchingService.findMatchingInvestors(
+            request.getPrompt(),
+            request.getTopK(),
+            request.getMinConfidence()
         );
         
         // 결과 처리
