@@ -13,7 +13,8 @@ import {
   CloudDownloadOutlined,
   UserOutlined,
   LogoutOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  BookOutlined
 } from '@ant-design/icons';
 
 import Dashboard from './pages/Dashboard';
@@ -24,6 +25,7 @@ import Funds from './pages/Funds';
 import OtherActivities from './pages/OtherActivities';
 import Labeling from './pages/Labeling';
 import APIDocs from './pages/APIDocs';
+import RecommendationAPISchema from './pages/RecommendationAPISchema';
 import Reports from './pages/Reports';
 import ReportView from './pages/ReportView';
 import Blacklist from './pages/Blacklist';
@@ -188,6 +190,12 @@ const AppContent: React.FC = () => {
       style: hasPermission('access_api_docs') ? {} : { color: '#722ed1' },
     },
     {
+      key: '/recommendation-api-schema',
+      icon: hasPermission('access_recommendation_api_schema') ? <BookOutlined /> : <LockOutlined />,
+      label: '추천 API 스키마',
+      style: hasPermission('access_recommendation_api_schema') ? {} : { color: '#722ed1' },
+    },
+    {
       key: '/data-mart',
       icon: <DatabaseOutlined />,
       label: '데이터 마트',
@@ -229,6 +237,10 @@ const AppContent: React.FC = () => {
     }
     if (key === '/profile-management' && !hasPermission('access_profile_management')) {
       message.warning('프로필 관리 페이지 접근 권한이 없습니다.');
+      return;
+    }
+    if (key === '/recommendation-api-schema' && !hasPermission('access_recommendation_api_schema')) {
+      message.warning('추천 API 스키마 페이지 접근 권한이 없습니다.');
       return;
     }
     history.push(key);
@@ -315,6 +327,15 @@ const AppContent: React.FC = () => {
                   return <NotFound />;
                 }
                 return <APIDocs />;
+              }} 
+            />
+            <Route 
+              path="/recommendation-api-schema" 
+              render={() => {
+                if (!hasPermission('access_recommendation_api_schema')) {
+                  return <NotFound />;
+                }
+                return <RecommendationAPISchema />;
               }} 
             />
             <PrivateRoute path="/data-mart" component={DataMart} />
