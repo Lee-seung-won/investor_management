@@ -18,6 +18,7 @@ interface User {
     access_api_docs: boolean;
     access_profile_management: boolean;
     collect_data_mart: boolean;
+    access_recommendation_api_schema: boolean;
   };
   created_at: string | null;
   last_login: string | null;
@@ -32,6 +33,7 @@ const PERMISSION_LABELS: { [key: string]: string } = {
   access_api_docs: 'API 문서 페이지 접근',
   access_profile_management: '프로필 관리 페이지 접근',
   collect_data_mart: '데이터마트 수집',
+  access_recommendation_api_schema: '추천 API 스키마 페이지 접근',
 };
 
 const UserManagement: React.FC = () => {
