@@ -197,6 +197,16 @@ export const labelingAPI = {
 };
 
 // 뉴스 수집 관련 API
+// DIPA 펀드 정보 수집 관련 API
+export const dipaFundCollectionAPI = {
+  startCollection: (resume: boolean = false) => 
+    api.post('/api/collect-dipa-fund-info', { resume }),
+  stopCollection: () => 
+    api.post('/api/collect-dipa-fund-info/stop', {}),
+  getStatus: () => 
+    api.get('/api/collect-dipa-fund-info/status'),
+};
+
 export const newsCollectionAPI = {
   getStatus: () => api.get('/api/collect-news/status'),
   startCollection: (user_id: number | null, limit: number = 10, resume: boolean = false) => api.post('/api/collect-news', { user_id, limit, resume }),

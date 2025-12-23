@@ -1,75 +1,91 @@
 import React, { useState, useEffect } from 'react';
 import { Card, Progress, Button, message, Space, Typography, Row, Col, Statistic, Spin, Tag } from 'antd';
-import { PlayCircleOutlined, StopOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons';
-import { reportCollectionAPI } from '../services/api.ts';
+import { PlayCircleOutlined, StopOutlined, ReloadOutlined, CheckCircleOutlined, ExclamationCircleOutlined, LockOutlined } from '@ant-design/icons';
+import { dipaFundCollectionAPI } from '../services/api.ts';
+import { usePermissions } from '../utils/permissions';
 
 const { Text } = Typography;
 
-interface CollectionStatus {
+interface DIPACollectionStatus {
   is_running: boolean;
   progress: number;
   total_investors: number;
   processed_investors: number;
-  collected_reports: number;
-  success_count: number;
-  fail_count: number;
+  updated_funds: number;
   start_time: string | null;
   end_time: string | null;
   error_message: string | null;
   current_investor_index: number;
-  can_resume: boolean;
   current_investor_name: string | null;
+  can_resume: boolean;
 }
 
-const ReportCollectionProgress: React.FC = () => {
-  const [status, setStatus] = useState<CollectionStatus | null>(null);
+const DIPAFundCollectionProgress: React.FC = () => {
+  const { hasPermission } = usePermissions();
+  const [status, setStatus] = useState<DIPACollectionStatus | null>(null);
   const [loading, setLoading] = useState(false);
   const [collecting, setCollecting] = useState(false);
   const [polling, setPolling] = useState(false);
 
   const fetchStatus = async () => {
     try {
-      const response = await reportCollectionAPI.getStatus();
+      const response = await dipaFundCollectionAPI.getStatus();
       setStatus(response.data);
     } catch (error) {
-      console.error('수집 상태 조회 실패:', error);
+      console.error('DIPA 펀드 정보 수집 상태 조회 실패:', error);
     }
   };
 
   const startCollection = async (resume: boolean = false) => {
+    if (!hasPermission('collect_dipa_fund_info')) {
+      message.warning('DIPA 펀드 정보 수집 권한이 없습니다.');
+      return;
+    }
     try {
       setCollecting(true);
-      const response = await reportCollectionAPI.startCollection({ resume });
+      const response = await dipaFundCollectionAPI.startCollection(resume);
       
       if (response.data.status === 'running') {
-        message.warning('보고서 수집이 이미 진행 중입니다.');
+        message.warning('DIPA 펀드 정보 수집이 이미 진행 중입니다.');
       } else {
         message.success(response.data.message);
         setPolling(true);
       }
     } catch (error) {
-      message.error('보고서 수집 시작에 실패했습니다.');
+      message.error('DIPA 펀드 정보 수집 시작에 실패했습니다.');
     } finally {
       setCollecting(false);
     }
   };
 
   const stopCollection = async () => {
+    if (!hasPermission('collect_dipa_fund_info')) {
+      message.warning('DIPA 펀드 정보 수집 권한이 없습니다.');
+      return;
+    }
     try {
-      const response = await reportCollectionAPI.stopCollection();
+      const response = await dipaFundCollectionAPI.stopCollection();
       message.success(response.data.message);
       setPolling(false);
     } catch (error) {
-      message.error('보고서 수집 중단에 실패했습니다.');
+      message.error('DIPA 펀드 정보 수집 중단에 실패했습니다.');
     }
   };
 
   const stopMonitoring = () => {
+    if (!hasPermission('collect_dipa_fund_info')) {
+      message.warning('DIPA 펀드 정보 수집 권한이 없습니다.');
+      return;
+    }
     setPolling(false);
     message.info('수집 상태 모니터링을 중지했습니다.');
   };
 
   const refreshStatus = async () => {
+    if (!hasPermission('collect_dipa_fund_info')) {
+      message.warning('DIPA 펀드 정보 수집 권한이 없습니다.');
+      return;
+    }
     setLoading(true);
     try {
       await fetchStatus();
@@ -130,15 +146,17 @@ const ReportCollectionProgress: React.FC = () => {
       title={
         <Space>
           {getStatusIcon()}
-          <span>보고서 수집 상태</span>
+          <span>펀드결성금액정보 수집 상태</span>
         </Space>
       }
       extra={
         <Space>
           <Button 
-            icon={<ReloadOutlined />} 
+            icon={hasPermission('collect_dipa_fund_info') ? <ReloadOutlined /> : <LockOutlined />}
             onClick={refreshStatus}
             loading={loading}
+            disabled={!hasPermission('collect_dipa_fund_info')}
+            style={!hasPermission('collect_dipa_fund_info') ? { color: '#722ed1', borderColor: '#722ed1' } : {}}
           >
             새로고침
           </Button>
@@ -148,18 +166,22 @@ const ReportCollectionProgress: React.FC = () => {
                 {status?.can_resume ? (
                   <Button 
                     type="primary" 
-                    icon={<PlayCircleOutlined />}
+                    icon={hasPermission('collect_dipa_fund_info') ? <PlayCircleOutlined /> : <LockOutlined />}
                     onClick={() => startCollection(true)}
                     loading={collecting}
+                    disabled={!hasPermission('collect_dipa_fund_info')}
+                    style={!hasPermission('collect_dipa_fund_info') ? { background: '#722ed1', borderColor: '#722ed1' } : {}}
                   >
                     수집 재개
                   </Button>
                 ) : (
                   <Button 
                     type="primary" 
-                    icon={<PlayCircleOutlined />}
+                    icon={hasPermission('collect_dipa_fund_info') ? <PlayCircleOutlined /> : <LockOutlined />}
                     onClick={() => startCollection(false)}
                     loading={collecting}
+                    disabled={!hasPermission('collect_dipa_fund_info')}
+                    style={!hasPermission('collect_dipa_fund_info') ? { background: '#722ed1', borderColor: '#722ed1' } : {}}
                   >
                     수집 시작
                   </Button>
@@ -168,16 +190,20 @@ const ReportCollectionProgress: React.FC = () => {
             ) : (
               <Button 
                 danger
-                icon={<StopOutlined />}
+                icon={hasPermission('collect_dipa_fund_info') ? <StopOutlined /> : <LockOutlined />}
                 onClick={stopCollection}
+                disabled={!hasPermission('collect_dipa_fund_info')}
+                style={!hasPermission('collect_dipa_fund_info') ? { background: '#722ed1', borderColor: '#722ed1', color: '#fff' } : {}}
               >
                 수집 중단
               </Button>
             )}
             {status?.is_running && (
               <Button 
-                icon={<StopOutlined />}
+                icon={hasPermission('collect_dipa_fund_info') ? <StopOutlined /> : <LockOutlined />}
                 onClick={stopMonitoring}
+                disabled={!hasPermission('collect_dipa_fund_info')}
+                style={!hasPermission('collect_dipa_fund_info') ? { color: '#722ed1', borderColor: '#722ed1' } : {}}
               >
                 모니터링 중지
               </Button>
@@ -206,20 +232,24 @@ const ReportCollectionProgress: React.FC = () => {
                 {status.processed_investors} / {status.total_investors} 투자사 처리
               </Text>
               <Text type="secondary">
-                {status.collected_reports}개 보고서 수집
+                {status.updated_funds}개 펀드 업데이트
               </Text>
             </div>
-            {status.current_investor_name && status.is_running && (
-              <div style={{ marginTop: '8px' }}>
-                <Text type="secondary">현재 처리 중: </Text>
-                <Text strong>{status.current_investor_name}</Text>
-              </div>
-            )}
           </div>
+
+          {/* 현재 처리 중인 투자사 */}
+          {status.is_running && status.current_investor_name && (
+            <div style={{ marginBottom: '16px', padding: '12px', backgroundColor: '#e6f7ff', borderRadius: '6px' }}>
+              <Text type="secondary">현재 처리 중: </Text>
+              <Text strong style={{ color: '#1890ff' }}>
+                {status.current_investor_name}
+              </Text>
+            </div>
+          )}
 
           {/* 통계 정보 */}
           <Row gutter={16}>
-            <Col span={6}>
+            <Col span={8}>
               <Statistic
                 title="처리된 투자사"
                 value={status.processed_investors}
@@ -227,25 +257,18 @@ const ReportCollectionProgress: React.FC = () => {
                 valueStyle={{ color: '#1890ff' }}
               />
             </Col>
-            <Col span={6}>
+            <Col span={8}>
               <Statistic
-                title="수집된 보고서"
-                value={status.collected_reports}
+                title="업데이트된 펀드"
+                value={status.updated_funds}
                 valueStyle={{ color: '#52c41a' }}
               />
             </Col>
-            <Col span={6}>
+            <Col span={8}>
               <Statistic
-                title="성공"
-                value={status.success_count}
-                valueStyle={{ color: '#52c41a' }}
-              />
-            </Col>
-            <Col span={6}>
-              <Statistic
-                title="실패"
-                value={status.fail_count}
-                valueStyle={{ color: '#ff4d4f' }}
+                title="상태"
+                value={getStatusText()}
+                valueStyle={{ color: getStatusColor() }}
               />
             </Col>
           </Row>
@@ -295,7 +318,7 @@ const ReportCollectionProgress: React.FC = () => {
               borderRadius: '6px' 
             }}>
               <Text style={{ color: '#52c41a' }}>
-                <CheckCircleOutlined /> 보고서 수집이 완료되었습니다!
+                <CheckCircleOutlined /> 펀드결성금액정보 수집이 완료되었습니다!
               </Text>
             </div>
           )}
@@ -320,9 +343,4 @@ const ReportCollectionProgress: React.FC = () => {
   );
 };
 
-export default ReportCollectionProgress;
-
-
-
-
-
+export default DIPAFundCollectionProgress;

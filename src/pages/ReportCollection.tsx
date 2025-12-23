@@ -3,6 +3,7 @@ import { Row, Col, Typography, Result, Button } from 'antd';
 import { FileTextOutlined, HomeOutlined } from '@ant-design/icons';
 import { useHistory } from 'react-router-dom';
 import ReportCollectionProgress from '../components/ReportCollectionProgress';
+import DIPAFundCollectionProgress from '../components/DIPAFundCollectionProgress';
 import { usePermissions } from '../utils/permissions';
 
 const { Title } = Typography;
@@ -36,6 +37,12 @@ const ReportCollection: React.FC = () => {
       <Row gutter={[16, 16]} style={{ marginBottom: 24 }}>
         <Col span={24}>
           <ReportCollectionProgress />
+        </Col>
+      </Row>
+
+      <Row gutter={[16, 16]}>
+        <Col span={24}>
+          <DIPAFundCollectionProgress />
         </Col>
       </Row>
     </div>

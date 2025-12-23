@@ -8,6 +8,7 @@ interface InvestorWithCount {
   investor_id: number;
   investor_name: string;
   fund_count: number;
+  dipa_disclosure_url?: string;
 }
 
 const Funds: React.FC = () => {
@@ -35,6 +36,7 @@ const Funds: React.FC = () => {
           investor_id: inv.id,
           investor_name: inv.name,
           fund_count: inv.fund_count || 0,
+          dipa_disclosure_url: inv.dipa_disclosure_url || null,
         }));
         // 펀드 개수순으로 정렬 (내림차순)
         investorsWithCount.sort((a, b) => b.fund_count - a.fund_count);
@@ -294,6 +296,19 @@ const Funds: React.FC = () => {
                   전체 펀드정보 갱신하기
                 </Button>
                 <Button 
+                  onClick={() => {
+                    if (selectedInvestor?.dipa_disclosure_url) {
+                      window.open(selectedInvestor.dipa_disclosure_url, '_blank');
+                    } else {
+                      message.warning('공시사이트 URL이 저장되지 않았습니다. DIPA 펀드 정보 수집기를 실행하여 URL을 수집해주세요.');
+                    }
+                  }}
+                  type="default"
+                  disabled={!selectedInvestor?.dipa_disclosure_url}
+                >
+                  공시사이트 바로가기
+                </Button>
+                <Button 
                   icon={<ReloadOutlined />} 
                   onClick={fetchFunds}
                   loading={reportLoading}
@@ -365,7 +380,7 @@ const Funds: React.FC = () => {
                     dataSource={funds}
                     rowKey={(record) => record.id || record.fund_name}
                     pagination={false}
-                    scroll={{ y: 'calc(100vh - 550px)', x: 1000 }}
+                    scroll={{ y: 'calc(100vh - 550px)', x: 1200 }}
                     defaultSortOrder={{ columnKey: 'registration_date', order: 'descend' }}
                     columns={[
                       {
@@ -436,17 +451,113 @@ const Funds: React.FC = () => {
                         },
                       },
                       {
+                        title: '결성총액',
+                        dataIndex: 'fund_amount',
+                        key: 'fund_amount',
+                        width: '15%',
+                        render: (amount: string) => {
+                          if (!amount) return '-';
+                          try {
+                            const numAmount = parseInt(amount);
+                            if (isNaN(numAmount)) return amount;
+                            // 억원 단위로 변환
+                            if (numAmount >= 100000000) {
+                              const eok = numAmount / 100000000;
+                              return `${eok.toFixed(2)}억원`;
+                            } else if (numAmount >= 10000) {
+                              const man = numAmount / 10000;
+                              return `${man.toFixed(0)}만원`;
+                            } else {
+                              return `${numAmount.toLocaleString()}원`;
+                            }
+                          } catch {
+                            return amount;
+                          }
+                        },
+                      },
+                      {
+                        title: '투자금액',
+                        dataIndex: 'investment_amount',
+                        key: 'investment_amount',
+                        width: '12%',
+                        render: (amount: string) => {
+                          if (!amount) return '-';
+                          try {
+                            const numAmount = parseInt(amount);
+                            if (isNaN(numAmount)) return amount;
+                            // 억원 단위로 변환
+                            if (numAmount >= 100000000) {
+                              const eok = numAmount / 100000000;
+                              return `${eok.toFixed(2)}억원`;
+                            } else if (numAmount >= 10000) {
+                              const man = numAmount / 10000;
+                              return `${man.toFixed(0)}만원`;
+                            } else {
+                              return `${numAmount.toLocaleString()}원`;
+                            }
+                          } catch {
+                            return amount;
+                          }
+                        },
+                      },
+                      {
+                        title: '잔액율',
+                        key: 'remaining_ratio',
+                        width: '10%',
+                        render: (_: any, record: any) => {
+                          const fundAmount = record.fund_amount;
+                          const investmentAmount = record.investment_amount;
+                          
+                          if (!fundAmount || !investmentAmount) return '-';
+                          
+                          try {
+                            const total = parseInt(fundAmount);
+                            const invested = parseInt(investmentAmount);
+                            
+                            if (isNaN(total) || isNaN(invested) || total === 0) return '-';
+                            
+                            const remaining = total - invested;
+                            const ratio = (remaining / total) * 100;
+                            
+                            // 잔액이 음수인 경우 처리
+                            if (ratio < 0) {
+                              return (
+                                <span style={{ color: '#ff4d4f' }}>
+                                  {ratio.toFixed(1)}%
+                                </span>
+                              );
+                            }
+                            
+                            // 잔액율에 따라 색상 구분
+                            let color = '#52c41a'; // 초록색 (기본)
+                            if (ratio < 10) {
+                              color = '#ff4d4f'; // 빨간색 (10% 미만)
+                            } else if (ratio < 30) {
+                              color = '#faad14'; // 주황색 (10-30%)
+                            }
+                            
+                            return (
+                              <span style={{ color, fontWeight: 'bold' }}>
+                                {ratio.toFixed(1)}%
+                              </span>
+                            );
+                          } catch {
+                            return '-';
+                          }
+                        },
+                      },
+                      {
                         title: '대표펀드매니저',
                         dataIndex: 'representative_manager',
                         key: 'representative_manager',
-                        width: '22%',
+                        width: '15%',
                         render: (text: string) => text || '-',
                       },
                       {
                         title: '펀드매니저',
                         dataIndex: 'fund_manager',
                         key: 'fund_manager',
-                        width: '23%',
+                        width: '15%',
                         render: (text: string) => text || '-',
                       },
                     ]}
